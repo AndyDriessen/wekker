@@ -1,13 +1,33 @@
 #define buzzerPinAdri 3
+int switchPinAdri = 4;
+int val;
+int val2;
+int buttonState;
+int counterAdri = 0;
 
 void setup() {
   // put your setup code here, to run once:
   pinMode(3, OUTPUT);//buzzer
-  pinMode(13, OUTPUT);//led indicator when singing a note
+  pinMode(switchPinAdri, INPUT);//knop
+  
+  buttonState = digitalRead(switchPinAdri);
+  Serial.begin(9600);
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+void loop() {// put your main code here, to run repeatedly:
+  buttonAdri();
+  
+  if(counterAdri == 10){
+    MethodSoundOneAdri();
+    delay(4000);
+    MethodSoundOneAdri();
+    delay(4000);
+    MethodSoundOneAdri();
+  }
+}
+
+void MethodSoundOneAdri()
+{  
   //int tellerAdri = 0;
   MethodTellerAdri();
   delay(300);
@@ -41,6 +61,26 @@ void loop() {
   delay(10);
   buzz(3, 680, 100);
 }
+
+void buttonAdri()
+{
+  val = digitalRead(switchPinAdri);
+  delay(10);
+  val2 = digitalRead(switchPinAdri);
+  if (val == val2)
+  {
+    if (val != buttonState)
+      {
+        while(val == LOW)
+          {
+            counterAdri++;
+            Serial.println(counterAdri);
+          }
+      }
+    buttonState = val;
+  }
+}
+
 
 void MethodTellerAdri(){
   for(int tellerAdri = 0; tellerAdri < 1000; tellerAdri = tellerAdri + 100){
