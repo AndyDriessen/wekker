@@ -1,5 +1,4 @@
 #define buzzerPinAdri 3
-#define buzzerPin1Adri 4
 
 void setup() {
   // put your setup code here, to run once:
@@ -10,14 +9,41 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   //int tellerAdri = 0;
-  //MethodTellerAdri();
-  //delay(1000);
-  buzz(4, 250, 180);
+  MethodTellerAdri();
+  delay(300);
+  buzz(3, 250, 180);
   delay(100);
+  buzz(3, 100, 100);
+  delay(100);
+  buzz(3, 200, 100);
+  delay(100);
+  buzz(3, 300, 100);
+  delay(100);
+  buzz(3, 400, 100);
+  delay(100);
+  buzz(3, 500, 100);
+  delay(100);
+  buzz(3, 600, 100);
+  delay(10);
+  buzz(3, 610, 100);
+  delay(10);
+  buzz(3, 620, 100);
+  delay(10);
+  buzz(3, 630, 100);
+  delay(10);
+  buzz(3, 640, 100);
+  delay(10);
+  buzz(3, 650, 100);
+  delay(10);
+  buzz(3, 660, 100);
+  delay(10);
+  buzz(3, 670, 100);
+  delay(10);
+  buzz(3, 680, 100);
 }
 
 void MethodTellerAdri(){
-  for(int tellerAdri = 0; tellerAdri < 1000; tellerAdri = tellerAdri + 200){
+  for(int tellerAdri = 0; tellerAdri < 1000; tellerAdri = tellerAdri + 100){
     buzz(3, tellerAdri, 58);
   }  
 }
