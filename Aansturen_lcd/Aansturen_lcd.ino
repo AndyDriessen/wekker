@@ -8,6 +8,7 @@ int countMillisShoo = 0; // Milliseconds.
 int countSecondsShoo = 0; // Seconds.
 int countMinutesShoo = 0; // Minutes.
 int countHoursShoo = 0; // Hours.
+int clockPaused = 0;
 
 
 LiquidCrystal_I2C lcd(0x3F, 20, 4); // Initialize new object called lcd, that contains
