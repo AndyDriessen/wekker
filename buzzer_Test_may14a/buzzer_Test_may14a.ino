@@ -75,6 +75,12 @@ void buttonAdri()
           {
             counterAdri++;
             Serial.println(counterAdri);
+            
+            while(counterAdri == 100)
+            {
+              MethodTellerAdri();
+              counterAdri = 0;
+            }
           }
       }
     buttonState = val;
