@@ -22,10 +22,7 @@ void setup()
 
 void loop()
 {
-  if (clockPaused == 0)
-  {
     MethodTimerTick(); // Perform logic to display current time.
-  }
 }
 
 // Method which will keep track of time(somewhat accurately).
