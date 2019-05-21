@@ -16,19 +16,6 @@ void setup() {
 
 void loop() {// put your main code here, to run repeatedly:
   buttonAdri();
-  
-  if(counterAdri == 10){
-    MethodSoundOneAdri();
-    delay(4000);
-    MethodSoundOneAdri();
-    delay(4000);
-    MethodSoundOneAdri();
-  }
-  else if(counterAdri == 20){
-    MethodTellerAdri();
-    MethodTellerAdri();
-    MethodTellerAdri();
-  }
 }
 
 void MethodSoundOneAdri()
@@ -80,13 +67,24 @@ void buttonAdri()
           {
             counterAdri++;
             Serial.println(counterAdri);
-            
-            while(counterAdri == 100)
+            //MethodTellerAdri();
+            if(counterAdri == 10)
             {
-              MethodTellerAdri();
-              counterAdri = 0;
+               Serial.print("10");
+               MethodSoundOneAdri();
+               delay(4000);
+               MethodSoundOneAdri();
+               delay(4000);
+               MethodSoundOneAdri();
             }
-          }
+            else if(counterAdri == 20)
+            {
+              Serial.print("20");
+              MethodTellerAdri();
+              MethodTellerAdri();
+              MethodTellerAdri();
+            }
+         }
       }
     buttonState = val;
   }
