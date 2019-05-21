@@ -1,16 +1,19 @@
-#define buzzerPinAdri 3
-int switchPinAdri = 4;
+#define buzzerPin 3
+int gloSwitchPinOne = 4;
+int gloSwitchPinTwo = 5;
 int val;
 int val2;
 int buttonState;
-int counterAdri = 0;
+int gloCounter = 0;
+int gloButtonPresses = 0;
 
 void setup() {
   // put your setup code here, to run once:
   pinMode(3, OUTPUT);//buzzer
-  pinMode(switchPinAdri, INPUT);//knop
+  pinMode(gloSwitchPinOne, INPUT);//knop
+  pinMode(gloSwitchPinTwo, INPUT);//knop
   
-  buttonState = digitalRead(switchPinAdri);
+  buttonState = digitalRead(gloSwitchPinOne);
   Serial.begin(9600);
 }
 
@@ -56,34 +59,45 @@ void MethodSoundOneAdri()
 
 void buttonAdri()
 {
-  val = digitalRead(switchPinAdri);
+  val = digitalRead(gloSwitchPinOne);
   delay(10);
-  val2 = digitalRead(switchPinAdri);
+  val2 = digitalRead(gloSwitchPinOne);
   if (val == val2)
   {
     if (val != buttonState)
-      {
-        while(val == LOW)
+      { 
+        if(val == LOW)
           {
-            counterAdri++;
-            Serial.println(counterAdri);
-            //MethodTellerAdri();
-            if(counterAdri == 10)
+            gloButtonPresses++;
+            while(gloButtonPresses = 1)
             {
-               Serial.print("10");
-               MethodSoundOneAdri();
-               delay(4000);
-               MethodSoundOneAdri();
-               delay(4000);
-               MethodSoundOneAdri();
+              Serial.println(gloButtonPresses);
+              gloCounter++;
+              Serial.println(gloCounter);
+              //MethodTellerAdri();
+              if(gloCounter == 10)
+              {
+                 Serial.print("10");
+                 MethodSoundOneAdri();
+                 delay(4000);
+                 MethodSoundOneAdri();
+                 delay(4000);
+                 MethodSoundOneAdri();
+              }
             }
-            else if(counterAdri == 20)
+            
+            if(gloButtonPresses = 2)
             {
-              Serial.print("20");
-              MethodTellerAdri();
-              MethodTellerAdri();
-              MethodTellerAdri();
+              Serial.println(gloButtonPresses);
+              if(gloCounter == 20)
+              {
+                Serial.print("20");
+                MethodTellerAdri();
+                MethodTellerAdri();
+                MethodTellerAdri();
+              }
             }
+            
          }
       }
     buttonState = val;
