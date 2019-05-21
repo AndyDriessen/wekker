@@ -24,6 +24,11 @@ void loop() {// put your main code here, to run repeatedly:
     delay(4000);
     MethodSoundOneAdri();
   }
+  else if(counterAdri == 20){
+    MethodTellerAdri();
+    MethodTellerAdri();
+    MethodTellerAdri();
+  }
 }
 
 void MethodSoundOneAdri()
