@@ -7,6 +7,7 @@ LiquidCrystal_I2C lcd(0x3F, 20, 4); // Initialize new object called lcd.
 #define aoJoyXVal A2 // X val on joy.
 #define aoJoyYVal A3 // Y val on joy.
 #define diJoyPress 3 // Btn on joystick.
+#define diBtnToggleAlarmAdri 6 // Btn to toggle alarm.
 
 int gloTimeMillis = millis(); // Will keep track of how many milliseconds have passed since start of program.
 int gloPrevTimeMillis = gloTimeMillis; // Val will keep track of difference between last noted time and current time.
@@ -33,10 +34,15 @@ int gloJoyStickValX = 0; // Value to keep track of stick movement.
 int gloJoyStickValY = 0; // Value to debounce.
 int gloJoyStickState = 0; // Keeps track of state stick is in.
 
+int gloBtnToggleAlarmVal = 0; // Value to keep track of toggle alarm button press.
+int gloBtnToggleAlarmVal2 = 0; // Debounce value.
+int gloBtnToggleAlarmState = 0; // Keeps track of state button is in.
+
 // Initial code at startup.
 void setup() {
   Serial.begin(9600); // Open serial console.
   pinMode(diJoyPress, INPUT); // Define joystick button.
+  pinMode(diBtnToggleAlarmAdri, INPUT); // Define toggle alarm button.
   digitalWrite(diJoyPress, HIGH); // Write joystick button high(default, unpressed value is high).
   lcd.init(); // initialize the lcd.
   lcd.backlight(); // Turns on backlight, otherwise lcd screen is very dark.
@@ -58,6 +64,7 @@ void loop() {
     MethodShowAlarm();
   }
 
+  MethodBtnToggleAlarmPress(); // Runs timer to toggle alarm on or off.
   MethodTmrTick(); // Runs method that makes timer tick.
   MethodJoyPress(); // Runs method that checks whether joystick button has been pressed.
 }
@@ -71,6 +78,27 @@ void MethodAlarmCheck() {
   if (locAlarmMinutes == gloCountMinutes && locAlarmHours == gloCountHours) {
     Serial.println("Alarm is going to sound."); // 
     MethodDoAlarm(); // Run method to make alarm go off.
+  }
+}
+
+void MethodBtnToggleAlarmPress() {
+  gloBtnToggleAlarmVal = digitalRead(diBtnToggleAlarmAdri); // Read btn value.
+  delay(10); // Delay
+  gloBtnToggleAlarmVal2 = digitalRead(diBtnToggleAlarmAdri); // Read it again.
+
+  //Check whether results were same(debounce function) and previous state. run timer method, which will start a 2 second timer, if it is held for 2 seconds change clockMode.
+  if (gloBtnToggleAlarmVal == gloBtnToggleAlarmVal2) {
+    // toggle alarm status if on first button press.
+    if (gloDoAlarm == 1 && gloBtnToggleAlarmState != gloBtnToggleAlarmVal && gloBtnToggleAlarmVal == LOW) {
+      Serial.println("Toggle alarm button pressed, turning alarm off.");
+      gloDoAlarm = 0; // Turn off alarm.
+    }
+    else if (gloDoAlarm == 0 && gloBtnToggleAlarmState != gloBtnToggleAlarmVal && gloBtnToggleAlarmVal == LOW) {
+      Serial.println("Toggle alarm button pressed, turning alarm on.");
+      gloDoAlarm = 1; // Turn on alarm.
+    }
+    
+    gloBtnToggleAlarmState = gloBtnToggleAlarmVal; // Update button state.
   }
 }
 
@@ -313,12 +341,6 @@ void MethodTmrTick()
       gloCountMinutes++; // Count minutes upwards.
       gloCountSeconds = 0; // Reset seconds to 0.
         
-      // If alarm is toggled on and it is currently displaying time, perform logic to check if alarm should fire.
-      if (gloDoAlarm == 1 && gloClockMode == 0) {
-        Serial.println("Performing alarm check...");
-        MethodAlarmCheck();
-      }
-        
       // If minutes have reached 60, a second has passed.
       if(gloCountMinutes >= 60)
       {
@@ -330,6 +352,12 @@ void MethodTmrTick()
         {
           gloCountHours = 0; // Reset hours to 0.
         }
+      }
+
+      // If alarm is toggled on and it is currently displaying time, perform logic to check if alarm should fire.
+      if (gloDoAlarm == 1 && gloClockMode == 0) {
+        Serial.println("Performing alarm check...");
+        MethodAlarmCheck();
       }
     }
   }
@@ -351,6 +379,15 @@ void MethodShowTime() {
   }
   
   String locTime = locCountHours + ":" + locCountMinutes; // Format string properly.
+
+  // If alarm is toggled on, add a '.' to display as user feedback.
+  if (gloDoAlarm == 1) {
+    locTime = locTime + "."; // Add dot to locTime.
+  }
+  else {
+    locTime = locTime + " "; // Add empty space to erase previous '.'.
+  }
+  
   MethodWriteToLcd(0, 0, locTime); // Write time to display.
 }
 
