@@ -22,6 +22,7 @@ int gloAlarmMinutes2 = 0; // Second digit.
 int gloAlarmHours = 0; // First digit of hour alarm is supposed to go off.
 int gloAlarmHours2 = 0; // Second digit.
 int gloAlarmDigitSelected = 0; // Keeps track of selected digit(one user is changing), from right to left.
+int gloDoAlarm = 1; // Whether alarm should fire or not.
 
 int gloJoyPressVal = 0; // Value to keep track if button has been pressed.
 int gloJoyPressVal2 = 0; // Value to debounce.
@@ -66,6 +67,20 @@ void MethodJoyPress() {
   else if (gloJoyButtonState == 1) {
     gloJoyButtonState = 0;
   }
+}
+
+void MethodAlarmCheck() {
+  int locAlarmMinutes = (String(gloAlarmMinutes2) + String(gloAlarmMinutes)).toInt();
+  int locAlarmHours = (String(gloAlarmHours2) + String(gloAlarmHours)).toInt();
+
+  if (locAlarmMinutes == gloCountMinutes && locAlarmHours == gloCountHours) {
+    Serial.println("Alarm is going to go off...");
+    MethodDoAlarm(); // Run method to make alarm go off.
+  }
+}
+
+void MethodDoAlarm() {
+  
 }
 
 void MethodShowAlarm() {
@@ -211,11 +226,9 @@ void MethodChangeAlarm() {
   else if (gloJoyStickValX > 250 && gloJoyStickValX < 750 && gloJoyStickValY > 250 && gloJoyStickValY < 750) {
     gloJoyStickState = 0;
   }
-
-  Serial.println("Vals: " + String(gloJoyStickValY) + " " + String(gloJoyStickValX));
 }
 
-// Method that will check if joystick button is being held, if it's held for 2 seconds it will change mode from regular clock display to changing alarm mode and vice versa.
+// Method that will check if joystick button is being held, if it's held for 2 seconds it will perform logic change mode from regular clock display to changing alarm mode and vice versa.
 void MethodTmrChangeModeShoo() {
   gloTimeMillis = millis(); // Get time.
 
@@ -224,27 +237,31 @@ void MethodTmrChangeModeShoo() {
     gloJoyPressMillis = gloTimeMillis;
   }
 
-  // If two seconds have passed since button was first pressed, switch clock mode to change alarm
+  // If two seconds have passed since button was first pressed, switch clock mode.
   if (gloTimeMillis - gloJoyPressMillis >= 2000) {
+    // Change to clock mode "change alarm".
     if (gloClockMode == 0) {
       gloClockMode = 1;
+      Serial.println("Changing to Clock mode 1, changing alarm mode..."); // Print debug text.
     }
     else if (gloClockMode == 1) {
       gloClockMode = 0;
+      Serial.println("Changing to Clock mode 0, displaying time..."); // Print debug text.
+      Serial.println("Alarm time set to: " + String(gloAlarmHours2) + String(gloAlarmHours) + ":" + String(gloAlarmMinutes2) + String(gloAlarmMinutes)); // Print set alarm.
       gloPrevAlarmTimeMillis = gloTimeMillis; // Gets current time for alarm digit blink.
     }
 
-    lcd.clear();
-    gloJoyPressMillis = gloTimeMillis; // Resets timer back to 0 seconds.
+    lcd.clear(); // Clear lcd.
+    gloJoyPressMillis = gloTimeMillis; // Resets timer back to 0 seconds, so that will switch again after 2 seconds.
   }
 }
 
 // Method which will keep track of time(somewhat accurately).
 void MethodTmrTick()
 {
-  gloTimeMillis = millis();
+  gloTimeMillis = millis(); // Get current time.
 
-  // If millis have reached 1000, a second has passed.
+  // If 1000 milliseconds have passed, a second has passed, so add 1000 millis to previous time and count a second upwards.
   while (gloTimeMillis - gloPrevTimeMillis >= 1000) {
     gloCountSeconds++; // Count seconds upwards.
     gloPrevTimeMillis = gloPrevTimeMillis + 1000;
@@ -253,14 +270,20 @@ void MethodTmrTick()
     if (gloCountSeconds >= 60) {
       gloCountMinutes++; // Count minutes upwards.
       gloCountSeconds = 0; // Reset seconds to 0.
-      
+        
+      // If alarm is toggled on and it is currently displaying time, perform logic to check if alarm should fire.
+      if (gloDoAlarm == 1 && gloClockMode == 0) {
+        Serial.println("Performing alarm check...");
+        MethodAlarmCheck();
+      }
+        
       // If minutes have reached 60, a second has passed.
       if(gloCountMinutes >= 60)
       {
         gloCountHours++; // Count hours upwards.
         gloCountMinutes = 0; // Reset minutes to 0.
         
-        // If millis have reached 24, a second has passed.
+        // If hours have reached 24, a day has passed so reset to 0.
         if (gloCountHours >= 24)
         {
           gloCountHours = 0; // Reset hours to 0.
