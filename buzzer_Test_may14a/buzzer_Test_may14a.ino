@@ -5,7 +5,7 @@ int val;
 int val2;
 int buttonState;
 int gloCounter = 0;
-int gloButtonPresses = 0;
+int gloAlarmTune = 0;
 
 void setup() {
   // put your setup code here, to run once:
@@ -68,36 +68,58 @@ void buttonAdri()
       { 
         if(val == LOW)
           {
-            gloButtonPresses++;
-            while(gloButtonPresses = 1)
-            {
-              Serial.println(gloButtonPresses);
-              gloCounter++;
-              Serial.println(gloCounter);
-              //MethodTellerAdri();
-              if(gloCounter == 10)
+            gloAlarmTune++;
+            
+            if (gloAlarmTune == 1) {
+              while(gloCounter < 11)
               {
-                 Serial.print("10");
-                 MethodSoundOneAdri();
-                 delay(4000);
-                 MethodSoundOneAdri();
-                 delay(4000);
-                 MethodSoundOneAdri();
+                Serial.println(gloAlarmTune);
+                gloCounter++;
+                Serial.println(gloCounter);
+                //MethodTellerAdri();
+                if(gloCounter == 10)
+                {
+                   Serial.print("10");
+                   MethodSoundOneAdri();
+                   //delay(4000);
+                   //MethodSoundOneAdri();
+                   //delay(4000);
+                   //MethodSoundOneAdri();
+                }
               }
             }
             
-            if(gloButtonPresses = 2)
+            if(gloAlarmTune == 2)
             {
-              Serial.println(gloButtonPresses);
-              if(gloCounter == 20)
-              {
-                Serial.print("20");
-                MethodTellerAdri();
-                MethodTellerAdri();
-                MethodTellerAdri();
+              while (gloCounter < 21) {
+                gloCounter++;
+                Serial.println(gloAlarmTune);
+                if(gloCounter == 20)
+                {
+                  Serial.print("20");
+                  MethodTellerAdri();
+                  MethodTellerAdri();
+                  MethodTellerAdri();
+                }
               }
             }
-            
+            if(gloAlarmTune == 3)
+            {
+              while (gloCounter < 31) {
+                gloCounter++;
+                Serial.println(gloAlarmTune);
+                if(gloCounter == 30)
+                {
+                  Serial.print("20");
+                  MethodTellerAdri();
+                  MethodTellerAdri();
+                  MethodTellerAdri();
+                  MethodSoundOneAdri();
+                }
+              }
+            }
+
+            gloCounter = 0;
          }
       }
     buttonState = val;
