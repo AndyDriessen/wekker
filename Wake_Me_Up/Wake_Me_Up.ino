@@ -1,5 +1,6 @@
 #include <Wire.h> // Include wire library, which facilitates serial communication with lcd.
 #include <LiquidCrystal_I2C.h> // Include I2C library for lcd screen.
+#include <EEPROM.h> // Include library that allows us to write data to memory.
 
 LiquidCrystal_I2C lcd(0x3F, 20, 4); // Initialize new object called lcd.
 
@@ -39,6 +40,10 @@ void setup() {
   digitalWrite(diJoyPress, HIGH); // Write joystick button high(default, unpressed value is high).
   lcd.init(); // initialize the lcd.
   lcd.backlight(); // Turns on backlight, otherwise lcd screen is very dark.
+  gloAlarmMinutes = EEPROM.read(0); // Get alarm minute from memory.
+  gloAlarmMinutes2 = EEPROM.read(1); // Get alarm minute2.
+  gloAlarmHours = EEPROM.read(2); // Get hour.
+  gloAlarmHours2 = EEPROM.read(3); // Get hour2.
 }
 
 // Main loop.
@@ -230,12 +235,21 @@ void MethodChangeAlarm() {
     gloJoyStickState = 0;
     gloJoyHeldMillis = gloTimeMillis;
   }
-  // Else if no input has been detected for 10 seconds, change clockmode back to 0 to resume displaying time.
+  // Else if no input has been detected for 10 seconds, change clockmode back to 0 to resume displaying time and writes alarm to memory.
   else if (gloTimeMillis - gloJoyHeldMillis > 27000) {
       gloClockMode = 0;
       Serial.println("Changing to Clock mode 0, displaying time..."); // Print debug text.
-      Serial.println("Alarm time set to: " + String(gloAlarmHours2) + String(gloAlarmHours) + ":" + String(gloAlarmMinutes2) + String(gloAlarmMinutes)); // Print set alarm.
+      MethodWriteAlarmToMemory(); // Run method that writes alarm to memory
   }
+}
+
+// Method which writes current alarm to memory
+void MethodWriteAlarmToMemory() {
+  Serial.println("Alarm time set to: " + String(gloAlarmHours2) + String(gloAlarmHours) + ":" + String(gloAlarmMinutes2) + String(gloAlarmMinutes)); // Print set alarm.
+  EEPROM.write(0, gloAlarmMinutes); // Write int alarm minutes to memory.
+  EEPROM.write(1, gloAlarmMinutes2); // Write minutes2 to memory.
+  EEPROM.write(2, gloAlarmHours); // Write hour to memory.
+  EEPROM.write(3, gloAlarmHours2); // Write hour2 to memory.
 }
 
 // Method which checks for joystick button press, if it is being held it method 'MethodTmrChangeModeShoo' that checks how long it is held for.
@@ -276,7 +290,7 @@ void MethodTmrChangeModeShoo() {
     else if (gloClockMode == 1) {
       gloClockMode = 0;
       Serial.println("Changing to Clock mode 0, displaying time..."); // Print debug text.
-      Serial.println("Alarm time set to: " + String(gloAlarmHours2) + String(gloAlarmHours) + ":" + String(gloAlarmMinutes2) + String(gloAlarmMinutes)); // Print set alarm.
+      MethodWriteAlarmToMemory(); // Run method that writes alarm to memory
     }
 
     lcd.clear(); // Clear lcd.
