@@ -21,10 +21,74 @@ void loop() {// put your main code here, to run repeatedly:
   buttonAdri();
 }
 
-void MethodSoundOneAdri()
+
+void buttonAdri()
+{
+  val = digitalRead(gloSwitchPinOne);
+  delay(10);
+  val2 = digitalRead(gloSwitchPinOne);
+  if (val == val2)
+  {
+    if (val != buttonState)
+      { 
+        if(val == LOW)
+          {
+            gloAlarmTune++;
+            
+            if (gloAlarmTune == 1) {
+              while(gloCounter < 11)
+              {
+                Serial.println(gloAlarmTune);
+                gloCounter++;
+                Serial.println(gloCounter);
+                //MethodTeller();
+                if(gloCounter == 10)
+                {
+                   Serial.print("10");
+                   MethodSoundOne();
+                }
+              }
+            }
+            
+            if(gloAlarmTune == 2)
+            {
+              while (gloCounter < 21) {
+                gloCounter++;
+                Serial.println(gloAlarmTune);
+                if(gloCounter == 20)
+                {
+                  Serial.print("20");
+                  MethodSoundTwo();
+                }
+              }
+            }
+            if(gloAlarmTune == 3)
+            {
+              while (gloCounter < 31) {
+                gloCounter++;
+                Serial.println(gloAlarmTune);
+                if(gloCounter == 30)
+                {
+                  Serial.print("20");
+                  MethodSoundThree();
+                }
+              }
+            }
+            if(gloAlarmTune > 3)
+            {
+              gloAlarmTune = 0;
+            }
+            gloCounter = 0;
+         }
+      }
+    buttonState = val;
+  }
+}
+
+void MethodSoundOne()
 {  
   //int tellerAdri = 0;
-  MethodTellerAdri();
+  MethodTeller();
   delay(300);
   buzz(3, 250, 180);
   delay(100);
@@ -57,77 +121,20 @@ void MethodSoundOneAdri()
   buzz(3, 680, 100);
 }
 
-void buttonAdri()
-{
-  val = digitalRead(gloSwitchPinOne);
-  delay(10);
-  val2 = digitalRead(gloSwitchPinOne);
-  if (val == val2)
-  {
-    if (val != buttonState)
-      { 
-        if(val == LOW)
-          {
-            gloAlarmTune++;
-            
-            if (gloAlarmTune == 1) {
-              while(gloCounter < 11)
-              {
-                Serial.println(gloAlarmTune);
-                gloCounter++;
-                Serial.println(gloCounter);
-                //MethodTellerAdri();
-                if(gloCounter == 10)
-                {
-                   Serial.print("10");
-                   MethodSoundOneAdri();
-                   //delay(4000);
-                   //MethodSoundOneAdri();
-                   //delay(4000);
-                   //MethodSoundOneAdri();
-                }
-              }
-            }
-            
-            if(gloAlarmTune == 2)
-            {
-              while (gloCounter < 21) {
-                gloCounter++;
-                Serial.println(gloAlarmTune);
-                if(gloCounter == 20)
-                {
-                  Serial.print("20");
-                  MethodTellerAdri();
-                  MethodTellerAdri();
-                  MethodTellerAdri();
-                }
-              }
-            }
-            if(gloAlarmTune == 3)
-            {
-              while (gloCounter < 31) {
-                gloCounter++;
-                Serial.println(gloAlarmTune);
-                if(gloCounter == 30)
-                {
-                  Serial.print("20");
-                  MethodTellerAdri();
-                  MethodTellerAdri();
-                  MethodTellerAdri();
-                  MethodSoundOneAdri();
-                }
-              }
-            }
-
-            gloCounter = 0;
-         }
-      }
-    buttonState = val;
-  }
+void MethodSoundTwo(){
+  MethodTeller();
+  MethodTeller();
+  MethodTeller();
 }
 
+void MethodSoundThree(){
+  MethodTeller();
+  MethodTeller();
+  MethodTeller();
+  MethodSoundOne();
+}
 
-void MethodTellerAdri(){
+void MethodTeller(){
   for(int tellerAdri = 0; tellerAdri < 1000; tellerAdri = tellerAdri + 100){
     buzz(3, tellerAdri, 58);
   }  
