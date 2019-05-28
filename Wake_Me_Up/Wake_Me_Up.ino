@@ -7,7 +7,9 @@ LiquidCrystal_I2C lcd(0x3F, 20, 4); // Initialize new object called lcd.
 #define aoJoyXVal A2 // X val on joy.
 #define aoJoyYVal A3 // Y val on joy.
 #define diJoyPress 3 // Btn on joystick.
+#define doMethodBuzzer 5 // Define MethodBuzzer to corresponding pin.
 #define diBtnToggleAlarmAdri 6 // Btn to toggle alarm.
+#define diBtnChangeAlarmTone 7 // Define button to change alarm tone to corresponding pin.
 
 int gloTimeMillis = millis(); // Will keep track of how many milliseconds have passed since start of program.
 int gloPrevTimeMillis = gloTimeMillis; // Val will keep track of difference between last noted time and current time.
@@ -26,6 +28,11 @@ int gloAlarmHours = 0; // First digit of hour alarm is supposed to go off.
 int gloAlarmHours2 = 0; // Second digit.
 int gloAlarmDigitSelected = 0; // Keeps track of selected digit(one user is changing), from right to left, so it knows which one not to blink.
 int gloDoAlarm = 1; // Whether alarm should fire or not.
+int gloAlarmTone = 0; // Currently selected alarm tone.
+
+int gloFrequencyRisingTone = 0; // Frequency.
+int gloDoMethodRisingTone = 0; // Whether sound should play.
+int gloMethodSoundOneStep = 0; // What step method sound one is at.
 
 int gloJoyPressVal = 0; // Value to keep track if joystick button has been pressed.
 int gloJoyPressVal2 = 0; // Value to debounce.
@@ -37,15 +44,23 @@ int gloJoyStickState = 0; // Keeps track of state stick is in.
 int gloBtnToggleAlarmVal = 0; // Value to keep track of toggle alarm button press.
 int gloBtnToggleAlarmVal2 = 0; // Debounce value.
 int gloBtnToggleAlarmState = 0; // Keeps track of state button is in.
+int gloValChangeAlarmTone = 0; // To read button state of change alarm tone.
+int gloVal2ChangeAlarmTone = 0; // Debounce variable.
+int gloButtonStateChangeAlarmTone = 0; // Records last state of change alarm tone button so only 1 press registers.
 
 // Initial code at startup.
 void setup() {
-  Serial.begin(9600); // Open serial console.
   pinMode(diJoyPress, INPUT); // Define joystick button.
+  pinMode(doMethodBuzzer, OUTPUT); // Set MethodBuzzer output.
   pinMode(diBtnToggleAlarmAdri, INPUT); // Define toggle alarm button.
   digitalWrite(diJoyPress, HIGH); // Write joystick button high(default, unpressed value is high).
+  pinMode(diBtnChangeAlarmTone, INPUT); // Button to change alarm tone.
+  
+  Serial.begin(9600); // Open serial console.
   lcd.init(); // initialize the lcd.
   lcd.backlight(); // Turns on backlight, otherwise lcd screen is very dark.
+  
+  gloButtonStateChangeAlarmTone = digitalRead(diBtnChangeAlarmTone);
   gloAlarmMinutes = EEPROM.read(0); // Get alarm minute from memory.
   gloAlarmMinutes2 = EEPROM.read(1); // Get alarm minute2.
   gloAlarmHours = EEPROM.read(2); // Get hour.
@@ -64,9 +79,93 @@ void loop() {
     MethodShowAlarm();
   }
 
-  MethodBtnToggleAlarmPress(); // Runs timer to toggle alarm on or off.
   MethodTmrTick(); // Runs method that makes timer tick.
   MethodJoyPress(); // Runs method that checks whether joystick button has been pressed.
+  MethodBtnToggleAlarmPress(); // Runs timer to toggle alarm on or off.
+  MethodChangeAlarmTone(); // Run method to check if user has toggles change alarm tone.
+  
+  // If it's supposed to play the rising tone, make it do so.
+  if (gloDoMethodRisingTone > 0) {
+    MethodRisingTone(); // Play rising tone sound.
+  }
+}
+
+void MethodChangeAlarmTone()
+{
+  gloValChangeAlarmTone = digitalRead(diBtnChangeAlarmTone);
+  delay(10);
+  gloVal2ChangeAlarmTone = digitalRead(diBtnChangeAlarmTone);
+  if (gloValChangeAlarmTone == gloVal2ChangeAlarmTone)
+  {
+    if (gloValChangeAlarmTone != gloButtonStateChangeAlarmTone)
+    { 
+      gloButtonStateChangeAlarmTone = gloValChangeAlarmTone;
+      
+      if(gloValChangeAlarmTone == LOW)
+      {
+        gloAlarmTone++;
+        gloFrequencyRisingTone = 0;
+        gloDoMethodRisingTone = 0;
+        gloMethodSoundOneStep = 0;
+        
+        if(gloAlarmTone >= 2)
+        {
+          gloAlarmTone = 0;
+        }
+      
+        Serial.println("Selected tune is: " + String(gloAlarmTone) + ". Sampling sound..."); // Print debug info.
+
+        // Check what current tone is and give user a sample sound.
+        if (gloAlarmTone == 0) {
+          MethodSound0();
+        }
+        else if (gloAlarmTone == 1)
+        {
+          MethodSound1();
+        }
+      }
+    }
+  }
+}
+
+// Method sound two is rising tone sound 3 times.
+void MethodSound0(){
+  gloFrequencyRisingTone = 0; // Reset the rising tone.
+  gloDoMethodRisingTone = 3; // Do method rising tone three times.
+}
+
+void MethodSound1(){
+  gloFrequencyRisingTone = 0; // Reset the rising tone.
+  gloDoMethodRisingTone = 1; // Do method rising tone three times.
+}
+
+// Method that plays a rising tone.
+void MethodRisingTone(){
+  if (gloFrequencyRisingTone < 1000){
+    gloFrequencyRisingTone = gloFrequencyRisingTone + 100;
+    MethodBuzz(5, gloFrequencyRisingTone, 58);
+  }  
+  else {
+    gloFrequencyRisingTone = 0;
+    gloDoMethodRisingTone--;
+    Serial.println("Finished an alarm sound cycle.");
+  }
+}
+
+void MethodBuzz(int locTargetPin, long locFrequency, long locMLength) {
+  digitalWrite(13, HIGH);
+  long locDelay = 1000000 / locFrequency / 1; // Was 2, calculate the delay gloValChangeAlarmTone between transitions.
+  // 1 second's worth of microseconds, divided by the locFrequency, then split in half since.
+  // there are two phases to each cycle.
+  long locNumCycles = locFrequency * locMLength / 1000; // calculate the number of cycles for proper timing.
+  // multiply locFrequency, which is really cycles per second, by the number of seconds to.
+  // get the total number of cycles to produce.
+  for (long locCurrentCycle = 0; locCurrentCycle < locNumCycles; locCurrentCycle++) {
+    digitalWrite(locTargetPin, HIGH); // write the MethodBuzzer pin high to push out the diaphram.
+    delayMicroseconds(locDelay); // wait for the calculated delay.
+    digitalWrite(locTargetPin, LOW); // write the MethodBuzzer pin low to pull back the diaphram.
+    delayMicroseconds(locDelay); // wait again for the calculated delay.
+  }
 }
 
 // Method which will check if current time matches alarm time and will run alarm sound if it matches.
