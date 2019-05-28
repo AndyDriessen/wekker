@@ -3,7 +3,8 @@ int gloSwitchPinOne = 4;
 int gloSwitchPinTwo = 5;
 int val;
 int val2;
-int buttonState;
+int buttonStateOne;
+int buttonStateTwo;
 int gloCounter = 0;
 int gloAlarmTune = 0;
 
@@ -12,8 +13,9 @@ void setup() {
   pinMode(3, OUTPUT);//buzzer
   pinMode(gloSwitchPinOne, INPUT);//knop
   pinMode(gloSwitchPinTwo, INPUT);//knop
-  
-  buttonState = digitalRead(gloSwitchPinOne);
+
+  buttonStateTwo = digitalRead(gloSwitchPinTwo);
+  buttonStateOne = digitalRead(gloSwitchPinOne);
   Serial.begin(9600);
 }
 
@@ -29,59 +31,37 @@ void buttonAdri()
   val2 = digitalRead(gloSwitchPinOne);
   if (val == val2)
   {
-    if (val != buttonState)
-      { 
-        if(val == LOW)
-          {
-            gloAlarmTune++;
-            
-            if (gloAlarmTune == 1) {
-              while(gloCounter < 11)
-              {
-                Serial.println(gloAlarmTune);
-                gloCounter++;
-                Serial.println(gloCounter);
-                //MethodTeller();
-                if(gloCounter == 10)
-                {
-                   Serial.print("10");
-                   MethodSoundOne();
-                }
-              }
-            }
-            
-            if(gloAlarmTune == 2)
-            {
-              while (gloCounter < 21) {
-                gloCounter++;
-                Serial.println(gloAlarmTune);
-                if(gloCounter == 20)
-                {
-                  Serial.print("20");
-                  MethodSoundTwo();
-                }
-              }
-            }
-            if(gloAlarmTune == 3)
-            {
-              while (gloCounter < 31) {
-                gloCounter++;
-                Serial.println(gloAlarmTune);
-                if(gloCounter == 30)
-                {
-                  Serial.print("20");
-                  MethodSoundThree();
-                }
-              }
-            }
-            if(gloAlarmTune > 3)
-            {
-              gloAlarmTune = 0;
-            }
-            gloCounter = 0;
-         }
+    if (val != buttonStateOne)
+    { 
+      buttonStateOne = val;
+      
+      if(val == LOW)
+      {
+        gloAlarmTune++;
+        
+        if(gloAlarmTune >= 3)
+        {
+          gloAlarmTune = 0;
+        }
+      
+        Serial.println("Selected tune is: " + String(gloAlarmTune) + ". Sampling sound..."); // Print debug info.
+        MethodSoundSample(); // run method to give user a sample of sound
       }
-    buttonState = val;
+    }
+  }
+}
+
+void MethodSoundSample() {
+  if (gloAlarmTune == 0) {
+    MethodSoundOne();
+  }
+  else if (gloAlarmTune == 1)
+  {
+    MethodSoundTwo();
+  }
+  else if (gloAlarmTune == 2)
+  {
+    MethodSoundThree();
   }
 }
 
@@ -137,6 +117,7 @@ void MethodSoundThree(){
 void MethodTeller(){
   for(int tellerAdri = 0; tellerAdri < 1000; tellerAdri = tellerAdri + 100){
     buzz(3, tellerAdri, 58);
+    buttonAdri();
   }  
 }
 
@@ -154,5 +135,4 @@ void buzz(int targetPin, long frequency, long m_length) {
     digitalWrite(targetPin, LOW); // write the buzzer pin low to pull back the diaphram
     delayMicroseconds(delayValue); // wait again or the calculated delay value
   }
-
 }
