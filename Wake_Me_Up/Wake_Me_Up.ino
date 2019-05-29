@@ -6,16 +6,19 @@ LiquidCrystal_I2C lcd(0x3F, 20, 4); // Initialize new object called lcd.
 
 #define aoJoyXVal A2 // X val on joy.
 #define aoJoyYVal A3 // Y val on joy.
+#define diSnoozeBtn 2 // Define snooze button.
 #define diJoyPress 3 // Btn on joystick.
 #define doMethodBuzzer 5 // Define MethodBuzzer to corresponding pin.
 #define diBtnToggleAlarmAdri 6 // Btn to toggle alarm.
 #define diBtnChangeAlarmTone 7 // Define button to change alarm tone to corresponding pin.
 
-int gloTimeMillis = millis(); // Will keep track of how many milliseconds have passed since start of program.
-int gloPrevTimeMillis = gloTimeMillis; // Val will keep track of difference between last noted time and current time.
-int gloJoyHeldMillis = 0; // Will keep track of how long joystick is being held.
-int gloJoyPressMillis = 0; // Will keep track of how long joy button is held.
-int gloPrevAlarmDigitTimeMillis = 0; // Timer keeps track of when to blink alarm digit.
+unsigned long gloTimeMillis = millis(); // Will keep track of how many milliseconds have passed since start of program.
+unsigned long gloPrevTimeMillis = gloTimeMillis; // Val will keep track of difference between last noted time and current time.
+unsigned long gloJoyHeldMillis = 0; // Will keep track of how long joystick is being held.
+unsigned long gloJoyPressMillis = 0; // Will keep track of how long joy button is held.
+unsigned long gloPrevDigitMillis = 0; // Timer keeps track of when to blink alarm digit.
+unsigned long gloTurnOffSoundShoo = 0; // Timer keeps track if snooze button is being held, if it is
+unsigned long gloSnoozeTimeShoo = 0; // Time till snooze is over..
 
 int gloCountSeconds = 0; // Seconds(not used but prevent bug where gloPrevTimeMillis goes negative around 27000).
 int gloCountMinutes = 0; // Minutes.
@@ -30,9 +33,9 @@ int gloAlarmDigitSelected = 0; // Keeps track of selected digit(one user is chan
 int gloDoAlarm = 1; // Whether alarm should fire or not.
 int gloAlarmTone = 0; // Currently selected alarm tone.
 
-int gloFrequencyRisingTone = 0; // Frequency.
-int gloDoMethodRisingTone = 0; // Whether sound should play.
-int gloMethodSoundOneStep = 0; // What step method sound one is at.
+int gloFrequency = 0; // Frequency.
+int gloDoMethodRisingTone = 0; // Whether rising tone sound should play.
+int gloDoMethodFallingTone = 0; // Whethr falling tone sound should play.
 
 int gloJoyPressVal = 0; // Value to keep track if joystick button has been pressed.
 int gloJoyPressVal2 = 0; // Value to debounce.
@@ -44,23 +47,31 @@ int gloJoyStickState = 0; // Keeps track of state stick is in.
 int gloBtnToggleAlarmVal = 0; // Value to keep track of toggle alarm button press.
 int gloBtnToggleAlarmVal2 = 0; // Debounce value.
 int gloBtnToggleAlarmState = 0; // Keeps track of state button is in.
-int gloValChangeAlarmTone = 0; // To read button state of change alarm tone.
-int gloVal2ChangeAlarmTone = 0; // Debounce variable.
-int gloButtonStateChangeAlarmTone = 0; // Records last state of change alarm tone button so only 1 press registers.
+
+int gloBtnChangeToneVal = 0; // To read button state of change alarm tone.
+int gloBtnChangeToneVal2 = 0; // Debounce variable.
+int gloBtnChangeToneState = 0; // Records last state of change alarm tone button so only 1 press registers.
+
+int gloBtnSnoozeVal = 0; // Value to keep track of snooze btn press.
+int gloBtnSnoozeVal2 = 0; // Debounce value.
+int gloBtnSnoozeState = 0; // Keeps track of previous state of snooze button.
+int gloAlarmSnoozed = 0; // If alarm is snoozed.
+int gloSoundAlarm = 0; // Variable that will sound alarm.
 
 // Initial code at startup.
 void setup() {
-  pinMode(diJoyPress, INPUT); // Define joystick button.
+  pinMode(diSnoozeBtn, INPUT); // Initialize snooze button.
+  pinMode(diJoyPress, INPUT); // Initialize joystick button.
   pinMode(doMethodBuzzer, OUTPUT); // Set MethodBuzzer output.
-  pinMode(diBtnToggleAlarmAdri, INPUT); // Define toggle alarm button.
-  digitalWrite(diJoyPress, HIGH); // Write joystick button high(default, unpressed value is high).
+  pinMode(diBtnToggleAlarmAdri, INPUT); // Initialize toggle alarm button.
   pinMode(diBtnChangeAlarmTone, INPUT); // Button to change alarm tone.
   
   Serial.begin(9600); // Open serial console.
+  digitalWrite(diJoyPress, HIGH); // Write joystick button high(default, unpressed value is high).
   lcd.init(); // initialize the lcd.
   lcd.backlight(); // Turns on backlight, otherwise lcd screen is very dark.
   
-  gloButtonStateChangeAlarmTone = digitalRead(diBtnChangeAlarmTone);
+  gloBtnChangeToneState = digitalRead(diBtnChangeAlarmTone); // Get current alarm state
   gloAlarmMinutes = EEPROM.read(0); // Get alarm minute from memory.
   gloAlarmMinutes2 = EEPROM.read(1); // Get alarm minute2.
   gloAlarmHours = EEPROM.read(2); // Get hour.
@@ -72,41 +83,53 @@ void loop() {
   // If clock mode is 0, perform logic to display current time.
   if (gloClockMode == 0) {
     MethodShowTime();
+    
+    // If alarm is supposed to go off, sound alarm and perform logic for snooze button..
+    if (gloSoundAlarm == 1) {
+      MethodSoundAlarm();
+    }
   }
   // Else if clock mode is 1, perform logic to change alarm time and show alarm on screen.
   else if (gloClockMode == 1) {
     MethodChangeAlarm();
     MethodShowAlarm();
   }
-
+  
   MethodTmrTick(); // Runs method that makes timer tick.
-  MethodJoyPress(); // Runs method that checks whether joystick button has been pressed.
-  MethodBtnToggleAlarmPress(); // Runs timer to toggle alarm on or off.
-  MethodChangeAlarmTone(); // Run method to check if user has toggles change alarm tone.
+
+  // If alarm isn't going off, check for misc inputs.
+  if (gloSoundAlarm == 0) {
+    MethodJoyPress(); // Runs method that checks whether joystick button has been pressed.
+    MethodBtnToggleAlarmPress(); // Runs timer to toggle alarm on or off.
+    MethodChangeAlarmTone(); // Run method to check if user has toggles change alarm tone.
+  }
   
   // If it's supposed to play the rising tone, make it do so.
   if (gloDoMethodRisingTone > 0) {
     MethodRisingTone(); // Play rising tone sound.
   }
+  // Play falling tone.
+  else if (gloDoMethodFallingTone > 0) {
+    MethodFallingTone(); // Play falling tone sound.
+  }
 }
 
 void MethodChangeAlarmTone()
 {
-  gloValChangeAlarmTone = digitalRead(diBtnChangeAlarmTone);
+  gloBtnChangeToneVal = digitalRead(diBtnChangeAlarmTone);
   delay(10);
-  gloVal2ChangeAlarmTone = digitalRead(diBtnChangeAlarmTone);
-  if (gloValChangeAlarmTone == gloVal2ChangeAlarmTone)
+  gloBtnChangeToneVal2 = digitalRead(diBtnChangeAlarmTone);
+  if (gloBtnChangeToneVal == gloBtnChangeToneVal2)
   {
-    if (gloValChangeAlarmTone != gloButtonStateChangeAlarmTone)
+    if (gloBtnChangeToneVal != gloBtnChangeToneState)
     { 
-      gloButtonStateChangeAlarmTone = gloValChangeAlarmTone;
+      gloBtnChangeToneState = gloBtnChangeToneVal;
       
-      if(gloValChangeAlarmTone == LOW)
+      if(gloBtnChangeToneVal == LOW)
       {
         gloAlarmTone++;
-        gloFrequencyRisingTone = 0;
+        gloFrequency = 0;
         gloDoMethodRisingTone = 0;
-        gloMethodSoundOneStep = 0;
         
         if(gloAlarmTone >= 2)
         {
@@ -130,31 +153,46 @@ void MethodChangeAlarmTone()
 
 // Method sound two is rising tone sound 3 times.
 void MethodSound0(){
-  gloFrequencyRisingTone = 0; // Reset the rising tone.
+  gloFrequency = 0; // Reset the rising tone.
   gloDoMethodRisingTone = 3; // Do method rising tone three times.
+  gloDoMethodFallingTone = 0; // Make sure other sound isn't playing
 }
 
 void MethodSound1(){
-  gloFrequencyRisingTone = 0; // Reset the rising tone.
-  gloDoMethodRisingTone = 1; // Do method rising tone three times.
+  gloFrequency = 1000; // Reset the rising tone.
+  gloDoMethodFallingTone = 3; // Do method falling tone three times.
+  gloDoMethodRisingTone = 0; // Make sure other sound isn't playing
 }
 
 // Method that plays a rising tone.
 void MethodRisingTone(){
-  if (gloFrequencyRisingTone < 1000){
-    gloFrequencyRisingTone = gloFrequencyRisingTone + 100;
-    MethodBuzz(5, gloFrequencyRisingTone, 58);
+  if (gloFrequency < 1000){
+    gloFrequency = gloFrequency + 100;
+    MethodBuzz(5, gloFrequency, 58);
   }  
   else {
-    gloFrequencyRisingTone = 0;
+    gloFrequency = 0;
     gloDoMethodRisingTone--;
+    Serial.println("Finished an alarm sound cycle.");
+  }
+}
+
+// Method that plays a rising tone.
+void MethodFallingTone(){
+  if (gloFrequency > 0){
+    gloFrequency = gloFrequency - 100;
+    MethodBuzz(5, gloFrequency, 58);
+  }  
+  else {
+    gloFrequency = 1000;
+    gloDoMethodFallingTone--;
     Serial.println("Finished an alarm sound cycle.");
   }
 }
 
 void MethodBuzz(int locTargetPin, long locFrequency, long locMLength) {
   digitalWrite(13, HIGH);
-  long locDelay = 1000000 / locFrequency / 1; // Was 2, calculate the delay gloValChangeAlarmTone between transitions.
+  long locDelay = 1000000 / locFrequency / 1; // Was 2, calculate the delay gloBtnChangeToneVal between transitions.
   // 1 second's worth of microseconds, divided by the locFrequency, then split in half since.
   // there are two phases to each cycle.
   long locNumCycles = locFrequency * locMLength / 1000; // calculate the number of cycles for proper timing.
@@ -165,18 +203,6 @@ void MethodBuzz(int locTargetPin, long locFrequency, long locMLength) {
     delayMicroseconds(locDelay); // wait for the calculated delay.
     digitalWrite(locTargetPin, LOW); // write the MethodBuzzer pin low to pull back the diaphram.
     delayMicroseconds(locDelay); // wait again for the calculated delay.
-  }
-}
-
-// Method which will check if current time matches alarm time and will run alarm sound if it matches.
-void MethodAlarmCheck() {
-  int locAlarmMinutes = (String(gloAlarmMinutes2) + String(gloAlarmMinutes)).toInt(); // Combine two seperate alarm minute values.
-  int locAlarmHours = (String(gloAlarmHours2) + String(gloAlarmHours)).toInt(); // Combine hour values.
-
-  // If both match, sound alarm.
-  if (locAlarmMinutes == gloCountMinutes && locAlarmHours == gloCountHours) {
-    Serial.println("Alarm is going to sound."); // 
-    MethodDoAlarm(); // Run method to make alarm go off.
   }
 }
 
@@ -201,9 +227,70 @@ void MethodBtnToggleAlarmPress() {
   }
 }
 
-// Empty method that will sound alarm.
-void MethodDoAlarm() {
-  
+// Method which will check if current time matches alarm time and will run alarm sound if it matches.
+void MethodAlarmCheck() {
+  int locAlarmMinutes = (String(gloAlarmMinutes2) + String(gloAlarmMinutes)).toInt(); // Combine two seperate alarm minute values.
+  int locAlarmHours = (String(gloAlarmHours2) + String(gloAlarmHours)).toInt(); // Combine hour values.
+
+  // If both match, sound alarm.
+  if (locAlarmMinutes == gloCountMinutes && locAlarmHours == gloCountHours) {
+    Serial.println("Alarm is going to sound."); // 
+    gloSoundAlarm = 1; // Sound alarm.
+    gloTurnOffSoundShoo = gloTimeMillis; // Reset time.
+  }
+}
+
+// Method that will check snooze button and if it isn't pressed, toggle alarm.
+void MethodSoundAlarm() {
+  gloTimeMillis = millis(); // Get time.
+  gloBtnSnoozeVal = digitalRead(diSnoozeBtn); // Read btn value.
+  delay(10); // Delay
+  gloBtnSnoozeVal2 = digitalRead(diSnoozeBtn); // Read it again.
+
+  //Check whether results were same(debounce function) and previous state. run timer method, which will start a 2 second timer, if it is held for 2 seconds change clockMode.
+  if (gloBtnSnoozeVal == gloBtnSnoozeVal2) {
+    // Turn alarm off for 5 minutes on single press and reset sound variables so that alarm sound stops instantly.
+    if (gloBtnSnoozeState != gloBtnSnoozeVal && gloBtnSnoozeVal == LOW && gloAlarmSnoozed == 0) {
+      Serial.println("Snoozed alarm for 5 minutes.");
+      gloAlarmSnoozed = 1; // Snooze alarm.
+      gloFrequency = 0;
+      gloDoMethodRisingTone = 0;
+      gloDoMethodFallingTone = 0;
+      gloSnoozeTimeShoo = gloTimeMillis; // Update snooze time.
+      gloTurnOffSoundShoo = gloTimeMillis; // Update turn off sound time.
+    }
+    // If button has been held for three seconds turn off alarm and reset all sound vars.
+    else if (gloTimeMillis - gloTurnOffSoundShoo > 3000 && gloBtnSnoozeVal == LOW) {
+      gloSoundAlarm = 0;
+      gloFrequency = 0;
+      gloDoMethodRisingTone = 0;
+      gloDoMethodFallingTone = 0;
+      Serial.println("Alarm turned off.");
+      MethodBuzz(5, 500, 100); // Make noise so that user is notified of alarm turning off. 
+    }
+    // Else if button has been released, reset turn off sound time.
+    else if (gloBtnSnoozeVal == HIGH){
+        gloTurnOffSoundShoo = gloTimeMillis; // Reset turn off sound time.
+    }
+    
+    gloBtnSnoozeState = gloBtnSnoozeVal; // Update button state.
+  }
+
+  if (gloAlarmSnoozed == 0) {
+    if (gloDoMethodRisingTone == 0 && gloAlarmTone == 0) {
+      Serial.println("Sounding alarm tone 0");
+      MethodSound0();
+    }
+    else if (gloDoMethodFallingTone == 0 && gloAlarmTone == 1) {
+      Serial.println("Sounding alarm tone 1");
+      MethodSound1();
+    }
+  }
+  // If it is snoozed and 300 seconds have passed, sound alarm again.
+  else if (gloAlarmSnoozed == 1 && gloTimeMillis - gloSnoozeTimeShoo > 300000) {
+    Serial.println("Alarm snooze finished, sounding alarm...");
+    gloAlarmSnoozed = 0;
+  }
 }
 
 // Method which displays the alarm time.
@@ -213,7 +300,7 @@ void MethodShowAlarm() {
   gloTimeMillis = millis(); // Get time.
 
   // Every 400ms, blink digit for 400ms, to indicate which character user is changing. This will create a blinking effect to indicate to user he is changing alarm.
-  if (gloTimeMillis - gloPrevAlarmDigitTimeMillis > 400) {
+  if (gloTimeMillis - gloPrevDigitMillis > 400) {
     if (gloAlarmDigitSelected == 0) {
       locAlarmString = "  : " + String(gloAlarmMinutes); // Only display furthest right digit.
     }
@@ -228,8 +315,8 @@ void MethodShowAlarm() {
     }
 
     // If 800 millis have passed, reset time back to 0.
-    if (gloTimeMillis - gloPrevAlarmDigitTimeMillis > 800) {
-      gloPrevAlarmDigitTimeMillis = gloTimeMillis; // Update time
+    if (gloTimeMillis - gloPrevDigitMillis > 800) {
+      gloPrevDigitMillis = gloTimeMillis; // Update time
     }
   }
   // Else display all character.
@@ -412,7 +499,7 @@ void MethodTmrChangeModeShoo() {
       gloClockMode = 1;
       Serial.println("Changing to Clock mode 1, changing alarm mode..."); // Print debug text.
       gloJoyHeldMillis = gloTimeMillis; // Gets current time for joy held value.
-      gloPrevAlarmDigitTimeMillis = gloTimeMillis; // Gets current time for alarm digit blink.
+      gloPrevDigitMillis = gloTimeMillis; // Gets current time for alarm digit blink.
     }
     else if (gloClockMode == 1) {
       gloClockMode = 0;
@@ -454,7 +541,7 @@ void MethodTmrTick()
       }
 
       // If alarm is toggled on and it is currently displaying time, perform logic to check if alarm should fire.
-      if (gloDoAlarm == 1 && gloClockMode == 0) {
+      if (gloDoAlarm == 1 && gloClockMode == 0 && gloClockMode == 0) {
         Serial.println("Performing alarm check...");
         MethodAlarmCheck();
       }
@@ -511,7 +598,7 @@ void MethodWriteToLcd(int locValX, int locValY, String locLcdString)
       }
 
       locValX = 0; // Set val x to beginning of line.
-      lcd.setCursor(locValX, locValY); // Set cursor to x an y vals.
+      lcd.setCursor(locValX, locValY); // Set cursor to x an y vals.s
     }
     
     lcd.print(locLcdString[locStringIndex]); // Print current character.
