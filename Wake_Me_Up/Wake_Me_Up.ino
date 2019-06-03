@@ -20,19 +20,19 @@ unsigned long gloPrevDigitMillis = 0; // Timer keeps track of when to blink alar
 unsigned long gloTurnOffSoundShoo = 0; // Timer keeps track of whether snooze button is being held, if it has been held for three seconds it will turn alarm off.
 unsigned long gloSnoozeTimeShoo = 0; // Time till snooze is over and alarm will sound again.
 
-int gloCountMinutes = 0; // Minutes.
-int gloCountHours = 0; // Hours.
-bool gloClockMode = 0; // What mode clock is in(0 is display time, 1 is change alarm).
-
 int gloAlarmMinutes = 0; // First digit of minute alarm is supposed to go off.
 int gloAlarmMinutes2 = 0; // Second digit.
 int gloAlarmHours = 0; // First digit of hour alarm is supposed to go off.
 int gloAlarmHours2 = 0; // Second digit.
-int gloAlarmDigitSelected = 0; // Keeps track of selected digit(one user is changing), from right to left, so it knows which one not to blink.
+int gloClockTimeMinutes = 0; // First digit of minute alarm is supposed to go off.
+int gloClockTimeMinutes2 = 0; // Second digit.
+int gloClockTimeHours = 0; // First digit of hour alarm is supposed to go off.
+int gloClockTimeHours2 = 0; // Second digit.
+int gloDigitSelected = 0; // Keeps track of selected digit(one user is changing), from right to left, so it knows which one not to blink.
 
 bool gloJoyPressVal = 0; // Value to keep track if joystick button has been pressed.
 bool gloJoyPressVal2 = 0; // Value to debounce.
-bool gloJoyButtonState = 0; // Keeps track of state button is in.
+int gloJoyButtonState = 0; // Keeps track of state button is in.
 int gloJoyStickValX = 0; // Value to keep track of stick movement.
 int gloJoyStickValY = 0; // Value to debounce.
 bool gloJoyStickState = 0; // Keeps track of state stick is in.
@@ -49,6 +49,8 @@ bool gloBtnSnoozeVal = 0; // Value to keep track of snooze btn press.
 bool gloBtnSnoozeVal2 = 0; // Debounce value.
 bool gloBtnSnoozeState = 0; // Keeps track of previous state of snooze button.
 
+bool gloClockMode = 0; // What mode clock is in(0 is display time, 1 is change alarm).
+bool gloChangeClockOrAlarm = 0; // Variable that keeps track of whether we are changing alarm or clock time.
 bool gloDoAlarm = 1; // Whether alarm should go off or not.
 bool gloAlarmSnoozed = 0; // If alarm is currently snoozed.
 bool gloSoundAlarm = 0; // Variable that will make alarm go off.
@@ -56,6 +58,37 @@ int gloAlarmTone = 0; // Currently configured alarm tone.
 int gloFrequency = 0; // Frequency that will be sent to buzzer.
 int gloDoMethodRisingTone = 0; // Whether rising tone sound should play.
 int gloDoMethodFallingTone = 0; // Whethr falling tone sound should play.
+
+// Define the bit patters for each of our custom chars. These are 5 bits wide and 8 dots deep.
+// Source for big letters: https://github.com/RalphBacon/LCD_Big_digits/blob/master/LCD_CustChar_Demo_2_With_Serial_Window_Stepthru/LCD_CustChar_Demo_2_With_Serial_Window_Stepthru.ino
+// And: https://www.youtube.com/watch?v=8ZsUcUAsL3I
+uint8_t custChar[8][8] = {
+  {31, 31, 31, 0, 0, 0, 0, 0},      // Small top line - 0
+  {0, 0, 0, 0, 0, 31, 31, 31},      // Small bottom line - 1
+  {31, 0, 0, 0, 0, 0, 0, 31},       // Small lines top and bottom -2
+  {0, 0, 0, 0, 0, 0,  0, 31},       // Thin bottom line - 3
+  {31, 31, 31, 31, 31, 31, 15, 7},  // Left bottom chamfer full - 4
+  {28, 30, 31, 31, 31, 31, 31, 31}, // Right top chamfer full -5
+  {31, 31, 31, 31, 31, 31, 30, 28}, // Right bottom chamfer full -6
+  {7, 15, 31, 31, 31, 31, 31, 31},  // Left top chamfer full -7
+};
+
+// Construct characters 0 through 9, ':' and '.', 254 is blank space and 255 is completely filled.
+uint8_t bigNums[13][6] = {
+  {7, 0, 5, 4, 1, 6},             // 0
+  {0, 5, 254, 1, 255, 1},         // 1
+  {0, 2, 5, 7, 3, 1},             // 2
+  {0, 2, 5, 1, 3, 6},             // 3
+  {7, 3, 255, 254, 254, 255},     // 4
+  {7, 2, 0, 1, 3, 6},             // 5
+  {7, 2, 0, 4, 3, 6},             // 6
+  {0, 0, 5, 254, 7, 254},         // 7
+  {7, 2, 5, 4, 3, 6},             // 8
+  {7, 2, 5, 1, 3, 6},             // 9
+  {254, 1, 254, 254, 0, 254},     // :
+  {254, 254, 254, 254, 1, 1},     // .
+  {254, 254, 254, 254, 254, 254}, //  
+};
 
 // Initial code at startup.
 void setup() {
@@ -75,32 +108,57 @@ void setup() {
   gloAlarmMinutes2 = EEPROM.read(1); // Get alarm minute2.
   gloAlarmHours = EEPROM.read(2); // Get hour.
   gloAlarmHours2 = EEPROM.read(3); // Get hour2.
+
+  // Map the custom characters(8 characters only!).
+  for (int cnt = 0; cnt < sizeof(custChar) / 8; cnt++) {
+    lcd.createChar(cnt, custChar[cnt]);
+  }
+
+  lcd.setCursor(0, 0); // Go to top of display.
+
+  // Print a line of characters along the top of display, for aesthetics.
+  for (int locCount = 0; locCount < 20; locCount++) {
+    lcd.print("-");
+  }
+
+  lcd.setCursor(0, 3); // Go to bottom line of display.
+
+  // Print a line of characters along the bottom of display, for aesthetics.
+  for (int locCount = 0; locCount < 20; locCount++) {
+    lcd.print("_");
+  }
 }
 
 // Main loop.
 void loop() {
   // If clock mode is 0, perform logic to display current time.
   if (gloClockMode == 0) {
+    MethodTmrTick(); // Runs method that makes timer tick.
     MethodShowTime();
-    
-    // If alarm is supposed to go off, sound alarm and perform logic for snooze button..
-    if (gloSoundAlarm == 1) {
-      MethodSoundAlarm();
-    }
   }
   // Else if clock mode is 1, perform logic to change alarm time and show alarm on screen.
   else if (gloClockMode == 1) {
-    MethodChangeAlarm();
-    MethodShowAlarm();
+    // If ChangeClockOrAlarm is 0, it is in change alarm mode so perform logic to display programmed alarm time and to change it.
+    if (gloChangeClockOrAlarm == 0) {
+      MethodChangeAlarm();
+      MethodShowAlarm();
+    }
+    // If ChangeClockOrAlarm is 1, it is in change clock time mode so perform logic to display programmed clock time and to change it.
+    else if (gloChangeClockOrAlarm == 1) {
+      MethodChangeClockTime();
+      MethodShowClockTime();
+    }
   }
-  
-  MethodTmrTick(); // Runs method that makes timer tick.
 
   // If alarm isn't going off, check for misc inputs.
   if (gloSoundAlarm == 0) {
     MethodJoyPress(); // Runs method that checks whether joystick button has been pressed.
     MethodBtnToggleAlarm(); // Runs timer to toggle alarm on or off.
     MethodChangeAlarmTone(); // Run method to check if user has toggles change alarm tone.
+  }
+  // If alarm is supposed to go off, sound alarm and perform logic for snooze button..
+  else if (gloSoundAlarm == 1) {
+    MethodSoundAlarm();
   }
   
   // If it's supposed to play the rising tone, make it do so.
@@ -145,6 +203,8 @@ void MethodChangeAlarmTone() {
 
 // Method that will make current selected tone's sound play.
 void MethodPlaySound() {
+  Serial.println("Starting alarm sound cycle...");
+  
   // Rising tone thrice.
   if (gloAlarmTone == 0) {
     gloFrequency = 0; // Reset the rising tone.
@@ -182,7 +242,6 @@ void MethodRisingTone() {
   else {
     gloFrequency = 0;
     gloDoMethodRisingTone--;
-    Serial.println("Finished an alarm sound cycle.");
   }
 }
 
@@ -197,7 +256,6 @@ void MethodFallingTone() {
   else {
     gloFrequency = 1000;
     gloDoMethodFallingTone--;
-    Serial.println("Finished an alarm sound cycle.");
   }
 }
 
@@ -291,23 +349,41 @@ void MethodBtnToggleAlarm() {
 
 // Method which displays the alarm time.
 void MethodShowAlarm() {
-  String locAlarmString = ""; // String which will be displayed.
-
   gloTimeMillis = millis(); // Get time.
 
   // Every 400ms, display only current digit and not others for 400ms. This will create a blinking effect to indicate to user he is changing alarm.
   if (gloTimeMillis - gloPrevDigitMillis > 400) {
-    if (gloAlarmDigitSelected == 0) {
-      locAlarmString = "  : " + String(gloAlarmMinutes); // Only display furthest right digit.
+    if (gloDigitSelected == 0) {
+      MethodPrintBigNum(12, 0, 1);
+      MethodPrintBigNum(12, 4, 1);
+      MethodPrintBigNum(10, 7, 1);
+      MethodPrintBigNum(12, 10, 1);
+      MethodPrintBigNum(gloAlarmMinutes, 14, 1);
+      MethodPrintBigNum(11, 17, 1);
     }
-    else if (gloAlarmDigitSelected == 1) {
-      locAlarmString = "  :" + String(gloAlarmMinutes2) + " "; // Etc.
+    else if (gloDigitSelected == 1) {
+      MethodPrintBigNum(12, 0, 1);
+      MethodPrintBigNum(12, 4, 1);
+      MethodPrintBigNum(10, 7, 1);
+      MethodPrintBigNum(gloAlarmMinutes2, 10, 1);
+      MethodPrintBigNum(12, 14, 1);
+      MethodPrintBigNum(11, 17, 1);
     }
-    else if (gloAlarmDigitSelected == 2) {
-      locAlarmString = " " + String(gloAlarmHours) + ":  ";
+    else if (gloDigitSelected == 2) {
+      MethodPrintBigNum(12, 0, 1);
+      MethodPrintBigNum(gloAlarmHours, 4, 1);
+      MethodPrintBigNum(10, 7, 1);
+      MethodPrintBigNum(12, 10, 1);
+      MethodPrintBigNum(12, 14, 1);
+      MethodPrintBigNum(11, 17, 1);
     }
-    else if (gloAlarmDigitSelected == 3) {
-      locAlarmString = String(gloAlarmHours2) + " :  ";
+    else if (gloDigitSelected == 3) {
+      MethodPrintBigNum(gloAlarmHours2, 0, 1);
+      MethodPrintBigNum(12, 4, 1);
+      MethodPrintBigNum(10, 7, 1);
+      MethodPrintBigNum(12, 10, 1);
+      MethodPrintBigNum(12, 14, 1);
+      MethodPrintBigNum(11, 17, 1);
     }
 
     // If 800 millis have passed, reset time back to 0 so that all digits are shown again.
@@ -317,10 +393,13 @@ void MethodShowAlarm() {
   }
   // Else display all digits.
   else {
-    locAlarmString = String(gloAlarmHours2) + String(gloAlarmHours) + ":" + String(gloAlarmMinutes2) + String(gloAlarmMinutes);
+    MethodPrintBigNum(gloAlarmHours2, 0, 1);
+    MethodPrintBigNum(gloAlarmHours, 4, 1);
+    MethodPrintBigNum(10, 7, 1);
+    MethodPrintBigNum(gloAlarmMinutes2, 10, 1);
+    MethodPrintBigNum(gloAlarmMinutes, 14, 1);
+    MethodPrintBigNum(11, 17, 1);
   }
-  
-  MethodWriteToLcd(0, 0, locAlarmString); // Display the created string.
 }
 
 // Method which will read joystick analog values, and perform logic to change alarm time as a consequence.
@@ -332,8 +411,8 @@ void MethodChangeAlarm() {
   // Check what position the joystick is in and if it has already performed an action in previous cycle(gloJoyStickState). Joystick is right direction.
   if (gloJoyStickValX > 750 && gloJoyStickState == 0) {
     // If there is a digit further to the right, select digit on the right.
-    if (gloAlarmDigitSelected > 0) {
-      gloAlarmDigitSelected--;
+    if (gloDigitSelected > 0) {
+      gloDigitSelected--;
     }
 
     gloJoyHeldMillis = gloTimeMillis;
@@ -342,8 +421,8 @@ void MethodChangeAlarm() {
   // Joystick is left direction, select digit to the left.
   else if (gloJoyStickValX < 250 && gloJoyStickState == 0) {
     // If there is a digit to the left, select digit to the left.
-    if (gloAlarmDigitSelected < 3) {
-      gloAlarmDigitSelected++;
+    if (gloDigitSelected < 3) {
+      gloDigitSelected++;
     }
 
     gloJoyHeldMillis = gloTimeMillis;
@@ -351,7 +430,7 @@ void MethodChangeAlarm() {
   }
   // Joystick is down direction, subtract 1 of current digit and perform check whether it will go below 0 if a digit were to be subtracted, and if it does, loop it around to max value, otherwise subtract 1.
   else if (gloJoyStickValY > 750 && gloJoyStickState == 0) {
-    if (gloAlarmDigitSelected == 0) {
+    if (gloDigitSelected == 0) {
       if (gloAlarmMinutes <= 0) {
         gloAlarmMinutes = 9; // Max is 9 for digit 0.
       }
@@ -359,7 +438,7 @@ void MethodChangeAlarm() {
         gloAlarmMinutes--;
       }
     }
-    else if (gloAlarmDigitSelected == 1) {
+    else if (gloDigitSelected == 1) {
       if (gloAlarmMinutes2 <= 0) {
         gloAlarmMinutes2 = 5; // Max is 5 for digit 1.
       }
@@ -367,7 +446,7 @@ void MethodChangeAlarm() {
         gloAlarmMinutes2--;
       }
     }
-    else if (gloAlarmDigitSelected == 2) {
+    else if (gloDigitSelected == 2) {
       if (gloAlarmHours <= 0 && gloAlarmHours2 >= 2) {
         gloAlarmHours = 3; // Max is 3 if digit 3 is 2
       }
@@ -378,7 +457,7 @@ void MethodChangeAlarm() {
         gloAlarmHours--;
       }
     }
-    else if (gloAlarmDigitSelected == 3) {
+    else if (gloDigitSelected == 3) {
       if (gloAlarmHours2 <= 0) {
         gloAlarmHours2 = 2; // Max is 2 for digit 3.
 
@@ -397,7 +476,7 @@ void MethodChangeAlarm() {
   }
   // Joystick is up direction, add 1 to current digit and perform check whether it will go below max value if 1 were to be added, and if it does, loop it around to min value(0), otherwise add 1, max values are found above.
   else if (gloJoyStickValY < 250 && gloJoyStickState == 0) {
-    if (gloAlarmDigitSelected == 0) {
+    if (gloDigitSelected == 0) {
       if (gloAlarmMinutes >= 9) {
         gloAlarmMinutes = 0;
       }
@@ -405,7 +484,7 @@ void MethodChangeAlarm() {
         gloAlarmMinutes++;
       }
     }
-    else if (gloAlarmDigitSelected == 1) {
+    else if (gloDigitSelected == 1) {
       if (gloAlarmMinutes2 >= 5) {
         gloAlarmMinutes2 = 0;
       }
@@ -413,7 +492,7 @@ void MethodChangeAlarm() {
         gloAlarmMinutes2++;
       }
     }
-    else if (gloAlarmDigitSelected == 2) {
+    else if (gloDigitSelected == 2) {
       if (gloAlarmHours >= 9 && gloAlarmHours2 < 2) {
         gloAlarmHours = 0;
       }
@@ -424,7 +503,7 @@ void MethodChangeAlarm() {
         gloAlarmHours++;
       }
     }
-    else if (gloAlarmDigitSelected == 3) {
+    else if (gloDigitSelected == 3) {
       if (gloAlarmHours2 >= 2) {
         gloAlarmHours2 = 0;
       }
@@ -447,9 +526,198 @@ void MethodChangeAlarm() {
   }
   // Else if no input has been detected for 10 seconds, change clockmode back to 0 to resume displaying time and writes alarm to memory.
   else if (gloTimeMillis - gloJoyHeldMillis > 27000) {
+      gloPrevTimeMillis = gloTimeMillis; // Reset prev time.
       gloClockMode = 0;
       Serial.println("Changing to Clock mode 0, displaying time..."); // Print debug text.
       MethodWriteAlarmToMemory(); // Run method that writes alarm to memory
+  }
+}
+
+// Method which displays the newly set time.
+void MethodShowClockTime() {
+  gloTimeMillis = millis(); // Get time.
+
+  // Every 400ms, display only current digit and not others for 400ms. This will create a blinking effect to indicate to user which digit he is changing.
+  if (gloTimeMillis - gloPrevDigitMillis > 400) {
+    if (gloDigitSelected == 0) {
+      MethodPrintBigNum(12, 0, 1);
+      MethodPrintBigNum(12, 4, 1);
+      MethodPrintBigNum(10, 7, 1);
+      MethodPrintBigNum(12, 10, 1);
+      MethodPrintBigNum(gloClockTimeMinutes, 14, 1);
+      MethodPrintBigNum(12, 17, 1);
+    }
+    else if (gloDigitSelected == 1) {
+      MethodPrintBigNum(12, 0, 1);
+      MethodPrintBigNum(12, 4, 1);
+      MethodPrintBigNum(10, 7, 1);
+      MethodPrintBigNum(gloClockTimeMinutes2, 10, 1);
+      MethodPrintBigNum(12, 14, 1);
+      MethodPrintBigNum(12, 17, 1);
+    }
+    else if (gloDigitSelected == 2) {
+      MethodPrintBigNum(12, 0, 1);
+      MethodPrintBigNum(gloClockTimeHours, 4, 1);
+      MethodPrintBigNum(10, 7, 1);
+      MethodPrintBigNum(12, 10, 1);
+      MethodPrintBigNum(12, 14, 1);
+      MethodPrintBigNum(12, 17, 1);
+    }
+    else if (gloDigitSelected == 3) {
+      MethodPrintBigNum(gloClockTimeHours2, 0, 1);
+      MethodPrintBigNum(12, 4, 1);
+      MethodPrintBigNum(10, 7, 1);
+      MethodPrintBigNum(12, 10, 1);
+      MethodPrintBigNum(12, 14, 1);
+      MethodPrintBigNum(12, 17, 1);
+    }
+
+    // If 800 millis have passed, reset time back to 0 so that all digits are shown again.
+    if (gloTimeMillis - gloPrevDigitMillis > 800) {
+      gloPrevDigitMillis = gloTimeMillis; // Update time
+    }
+  }
+  // Else display all digits.
+  else {
+    MethodPrintBigNum(gloClockTimeHours2, 0, 1);
+    MethodPrintBigNum(gloClockTimeHours, 4, 1);
+    MethodPrintBigNum(10, 7, 1);
+    MethodPrintBigNum(gloClockTimeMinutes2, 10, 1);
+    MethodPrintBigNum(gloClockTimeMinutes, 14, 1);
+    MethodPrintBigNum(12, 17, 1);
+  }
+}
+
+// Method which will read joystick analog values, and perform logic to change alarm time as a consequence.
+void MethodChangeClockTime() {
+  gloJoyStickValX = analogRead(aoJoyXVal); // X val.
+  gloJoyStickValY = analogRead(aoJoyYVal); // Y val.
+  gloTimeMillis = millis(); // Get time.
+
+  // Check what position the joystick is in and if it has already performed an action in previous cycle(gloJoyStickState). Joystick is right direction.
+  if (gloJoyStickValX > 750 && gloJoyStickState == 0) {
+    // If there is a digit further to the right, select digit on the right.
+    if (gloDigitSelected > 0) {
+      gloDigitSelected--;
+    }
+
+    gloJoyHeldMillis = gloTimeMillis;
+    gloJoyStickState = 1;
+  }
+  // Joystick is left direction, select digit to the left.
+  else if (gloJoyStickValX < 250 && gloJoyStickState == 0) {
+    // If there is a digit to the left, select digit to the left.
+    if (gloDigitSelected < 3) {
+      gloDigitSelected++;
+    }
+
+    gloJoyHeldMillis = gloTimeMillis;
+    gloJoyStickState = 1;
+  }
+  // Joystick is down direction, subtract 1 of current digit and perform check whether it will go below 0 if a digit were to be subtracted, and if it does, loop it around to max value, otherwise subtract 1.
+  else if (gloJoyStickValY > 750 && gloJoyStickState == 0) {
+    if (gloDigitSelected == 0) {
+      if (gloClockTimeMinutes <= 0) {
+        gloClockTimeMinutes = 9; // Max is 9 for digit 0.
+      }
+      else {
+        gloClockTimeMinutes--;
+      }
+    }
+    else if (gloDigitSelected == 1) {
+      if (gloClockTimeMinutes2 <= 0) {
+        gloClockTimeMinutes2 = 5; // Max is 5 for digit 1.
+      }
+      else {
+        gloClockTimeMinutes2--;
+      }
+    }
+    else if (gloDigitSelected == 2) {
+      if (gloClockTimeHours <= 0 && gloClockTimeHours2 >= 2) {
+        gloClockTimeHours = 3; // Max is 3 if digit 3 is 2
+      }
+      else if (gloClockTimeHours <= 0 && gloClockTimeHours2 <= 1){
+        gloClockTimeHours = 9; // Max is 9 if digit 3 is < 2
+      }
+      else {
+        gloClockTimeHours--;
+      }
+    }
+    else if (gloDigitSelected == 3) {
+      if (gloClockTimeHours2 <= 0) {
+        gloClockTimeHours2 = 2; // Max is 2 for digit 3.
+
+        // If digit 2 is above or equal to 4, set it to 3, which is the max value if digit 3 is 2.
+        if (gloClockTimeHours >= 4) {
+          gloClockTimeHours = 3;
+        }
+      }
+      else {
+        gloClockTimeHours2--;
+      }
+    }
+    
+    gloJoyHeldMillis = gloTimeMillis;
+    gloJoyStickState = 1;
+  }
+  // Joystick is up direction, add 1 to current digit and perform check whether it will go below max value if 1 were to be added, and if it does, loop it around to min value(0), otherwise add 1, max values are found above.
+  else if (gloJoyStickValY < 250 && gloJoyStickState == 0) {
+    if (gloDigitSelected == 0) {
+      if (gloClockTimeMinutes >= 9) {
+        gloClockTimeMinutes = 0;
+      }
+      else {
+        gloClockTimeMinutes++;
+      }
+    }
+    else if (gloDigitSelected == 1) {
+      if (gloClockTimeMinutes2 >= 5) {
+        gloClockTimeMinutes2 = 0;
+      }
+      else {
+        gloClockTimeMinutes2++;
+      }
+    }
+    else if (gloDigitSelected == 2) {
+      if (gloClockTimeHours >= 9 && gloClockTimeHours2 < 2) {
+        gloClockTimeHours = 0;
+      }
+      else if (gloAlarmHours >= 3 && gloClockTimeHours2 >= 2){
+        gloClockTimeHours = 0;
+      }
+      else {
+        gloClockTimeHours++;
+      }
+    }
+    else if (gloDigitSelected == 3) {
+      if (gloClockTimeHours2 >= 2) {
+        gloClockTimeHours2 = 0;
+      }
+      else {
+        gloClockTimeHours2++;
+        
+        if (gloClockTimeHours2 == 2 && gloClockTimeHours >= 4) {
+          gloClockTimeHours = 3;
+        }
+      }
+    }
+    
+    gloJoyHeldMillis = gloTimeMillis;
+    gloJoyStickState = 1;
+  }
+  // Else if stick is in middle or a second has passed, reset gloJoyStickState to 0 to allow new input on next cycle.
+  else if ((gloJoyStickValX > 250 && gloJoyStickValX < 750 && gloJoyStickValY > 250 && gloJoyStickValY < 750 || gloTimeMillis - gloJoyHeldMillis > 1000) && gloJoyStickState == 1) {
+    gloJoyStickState = 0;
+    gloJoyHeldMillis = gloTimeMillis;
+    //gloCountMinutes = (String(gloClockTimeMinutes2) + String(gloClockTimeMinutes)).toInt(); // Combine 2 seperate minute values.
+    //gloCountHours = (String(gloClockTimeHours2) + String(gloClockTimeHours)).toInt(); // Combine 2 seperate minute values.
+  }
+  // Else if no input has been detected for 10 seconds, change clockmode back to 0 to resume displaying time and writes alarm to memory.
+  else if (gloTimeMillis - gloJoyHeldMillis > 27000) {
+      gloPrevTimeMillis = gloTimeMillis; // Reset prev time.
+      gloClockMode = 0;
+      Serial.println("Changing to Clock mode 0, displaying time..."); // Print debug text.
+      MethodWriteAlarmToMemory(); // Run method that writes alarm newly set alarm to memory.
   }
 }
 
@@ -464,6 +732,7 @@ void MethodWriteAlarmToMemory() {
 
 // Method which checks for joystick button press, if it is held for 2 seconds it changes alarm mode to either 'change alarm' or 'display time'.
 void MethodJoyPress() {
+  
   gloJoyPressVal = digitalRead(diJoyPress); // Read joystick value.
   delay(10); // Delay
   gloJoyPressVal2 = digitalRead(diJoyPress); // Read it again.
@@ -475,6 +744,7 @@ void MethodJoyPress() {
     // Reset joystick press timer to current time if button state is 0.
     if (gloJoyButtonState == 0) {
       gloJoyPressMillis = gloTimeMillis;
+      gloJoyButtonState = 1; // Set button state to 1, which makes sure timer will not be reset until button is released.
     }
   
     // If two seconds have passed since button was first pressed, switch clock mode.
@@ -485,23 +755,33 @@ void MethodJoyPress() {
         Serial.println("Changing to Clock mode 1, changing alarm mode..."); // Print debug text.
         gloJoyHeldMillis = gloTimeMillis; // Resets joystick held timer.
         gloPrevDigitMillis = gloTimeMillis; // Gets current time for alarm digit blinker.
+        gloChangeClockOrAlarm = 0; // Set changeclock back to 0.
       }
       // Change clock mode to "display time".
       else if (gloClockMode == 1) {
+        gloPrevTimeMillis = gloTimeMillis; // Reset prev time.
         gloClockMode = 0;
         Serial.println("Changing to Clock mode 0, displaying time..."); // Print debug text.
         MethodWriteAlarmToMemory(); // Run method that writes alarm newly set alarm to memory.
       }
-  
-      lcd.clear(); // Clear lcd for new displayed text.
+
+      gloJoyButtonState = 2; // sets button state to 2 so that on release of button, it will not switch ChangeClockOrAlarm.
       gloJoyPressMillis = gloTimeMillis; // Resets timer back to 0 seconds, so that will switch again after 2 seconds.
     }
-    
-    gloJoyButtonState = 1; // Set button state to 1, which makes sure timer will not be reset.
   }
   // Else reset button state to 0 to register a following press.
-  else if (gloJoyButtonState == 1) {
-    gloJoyButtonState = 0;
+  else if (gloJoyButtonState >= 1) {
+    // If less then 2 seconds have passed since button was pressed and clockmode is 1 and button state is 1, toggle changeClockOrAlarm mode.
+    if (gloTimeMillis - gloJoyPressMillis < 2000 && gloClockMode == 1 && gloJoyButtonState == 1) {
+      if (gloChangeClockOrAlarm == 0) {
+        gloChangeClockOrAlarm = 1; // Let user change current time.
+      }
+      else if (gloChangeClockOrAlarm == 1) {
+        gloChangeClockOrAlarm = 0; // Let user change alarm time.
+      }
+    }
+    
+    gloJoyButtonState = 0; // Reset button state to 0.
   }
 }
 
@@ -512,32 +792,41 @@ void MethodTmrTick() {
   // If 60000 milliseconds have passed, a minute has passed, so add 60000 millis to previous time and count a minute upwards.
   while (gloTimeMillis - gloPrevTimeMillis >= 60000) {
     gloPrevTimeMillis = gloPrevTimeMillis + 60000;
-    gloCountMinutes++;
+    gloClockTimeMinutes++;
       
-    // If minutes have reached 60, an hour has passed, so count hour upward and reset minutes to 0.
-    if(gloCountMinutes >= 60)
+    // If furthest right digit of minutes has reached 9, set it back to 0 and count minutes2 upwards.
+    if(gloClockTimeMinutes >= 9)
     {
-      gloCountHours++;
-      gloCountMinutes = 0;
+      gloClockTimeMinutes2++;
+      gloClockTimeMinutes = 0;
       
-      // If hours have reached 24, a day has passed so reset hours to 0.
-      if (gloCountHours >= 24)
+      // if minutes2 has reached 6, 60 minutes have passed, so set minutes2 back to 0 and add 1 to hours.
+      if (gloClockTimeMinutes2 >= 6)
       {
-        gloCountHours = 0;
+        gloClockTimeHours++;
+        gloClockTimeMinutes2 = 0;
+
+        // If hours has reached 10 AND hours2 is less than 2, or hours has reached 4 AND hours2 has reached 2, count hours2 upwards and set hour back to 0.
+        if (gloClockTimeHours >= 10 && gloClockTimeHours2 < 2 || gloClockTimeMinutes >=4 && gloClockTimeHours2 >= 2) {
+          gloClockTimeHours2++;
+          gloClockTimeHours = 0;
+
+          // If hours2 has reached 3, reset it back to 0 since a full day has completed
+          if (gloClockTimeHours2 >= 3) {
+            gloClockTimeHours2 = 0;
+          }
+        }
       }
     }
 
     // If alarm is toggled on and it is currently displaying time, perform logic to check if alarm should go off.
-    if (gloDoAlarm == 1 && gloClockMode == 0 && gloClockMode == 0) {
+    if (gloDoAlarm == 1 && gloClockMode == 0) {
       Serial.println("Performing alarm check...");
-      int locAlarmMinutes = (String(gloAlarmMinutes2) + String(gloAlarmMinutes)).toInt(); // Combine two seperate alarm minute values.
-      int locAlarmHours = (String(gloAlarmHours2) + String(gloAlarmHours)).toInt(); // Combine hour values.
     
       // If both match, set logic so that alarm sounds.
-      if (locAlarmMinutes == gloCountMinutes && locAlarmHours == gloCountHours) {
+      if (gloAlarmMinutes == gloClockTimeMinutes && gloAlarmMinutes2 == gloClockTimeMinutes2 && gloAlarmHours == gloClockTimeHours && gloAlarmHours2 == gloClockTimeHours2) {
         Serial.println("Alarm is going to sound.");
         gloSoundAlarm = 1; // Sound alarm.
-        //gloTurnOffSoundShoo = gloTimeMillis; // Reset time for turning off sound i suspect it is dead code.
       }
     }
   }
@@ -545,56 +834,42 @@ void MethodTmrTick() {
 
 // Method which displays current time.
 void MethodShowTime() {
-  String locCountHours = String(gloCountHours); // Convert hour int to local string.
-  String locCountMinutes = String(gloCountMinutes); // Convert minutes.
-
-  // If string length is 1, add a 0 in front of string, otherwise displaying will go wrong and display #:# instead of ##:##.
-  if(locCountHours.length() == 1)
-  {
-    locCountHours = "0" + locCountHours;
-  }
-  if(locCountMinutes.length() == 1)
-  {
-    locCountMinutes = "0" + locCountMinutes;
-  }
-  
-  String locTime = locCountHours + ":" + locCountMinutes; // Format string properly.
-
+    MethodPrintBigNum(gloClockTimeHours2, 0, 1); // Prints hours.
+    MethodPrintBigNum(gloClockTimeHours, 4, 1);
+    MethodPrintBigNum(10, 7, 1); // Prints a ':'.
+    MethodPrintBigNum(gloClockTimeMinutes2, 10, 1); // Print minutes.
+    MethodPrintBigNum(gloClockTimeMinutes, 14, 1);
+    
   // If alarm is toggled on, add a '.' to display as user feedback.
   if (gloDoAlarm == 1) {
-    locTime = locTime + "."; // Add dot to locTime.
+    MethodPrintBigNum(11, 17, 1); // Print '.'.
   }
   else {
-    locTime = locTime + " "; // Add empty space to erase previous '.'.
+    MethodPrintBigNum(12, 17, 1); // Print " ".
   }
-  
-  MethodWriteToLcd(0, 0, locTime); // Write time string to display.
 }
 
-// Method that prints a string to specific place on Lcd, where x val is place on row, y is colomn and lcdString is string to be printed.
-void MethodWriteToLcd(int locValX, int locValY, String locLcdString) {
-  lcd.setCursor(locValX, locValY); // Set lcd to given values.
-  
-  int locStringLength = locLcdString.length(); // Get length of string.
+// Method that prints large chars, using the number passed along. For source of code see initialization.
+void MethodPrintBigNum(int number, int startCol, int startRow) {
+  // Position cursor to requested position (each char takes 3 cols plus a space col).
+  lcd.setCursor(startCol, startRow);
 
-  // While there is more text left to display in string, print the next character to lcd.
-  for(int locStringIndex = 0; locStringIndex < locStringLength; locStringIndex++)
-  {
-    // If lcd is at end of line, jump to next line.
-    if (locValX > 19)
-    {
-      locValY++;// Jump to next line.
+  // Each number split over two lines, 3 chars per line. Retrieve character from the main array to make working with it here a bit easier.
+  uint8_t thisNumber[6];
+  for (int cnt = 0; cnt < 6; cnt++) {
+    thisNumber[cnt] = bigNums[number][cnt];
+  }
 
-      // If next line is outside of lcd 4 lines, jump back to line 0.
-      if(locValY > 3) {
-        locValY = 0;
-      }
+  // Print first line (top half) of digit.
+  for (int cnt = 0; cnt < 3; cnt++) {
+    lcd.print((char)thisNumber[cnt]);
+  }
 
-      locValX = 0; // Set val x to beginning of line.
-      lcd.setCursor(locValX, locValY); // Set cursor to x an y vals.s
-    }
-    
-    lcd.print(locLcdString[locStringIndex]); // Print current character.
-    locValX++; // Go to next character.
+  // Now position cursor to next line at same start column for digit.
+  lcd.setCursor(startCol, startRow + 1);
+
+  // Print 2nd line (bottom half).
+  for (int cnt = 3; cnt < 6; cnt++) {
+    lcd.print((char)thisNumber[cnt]);
   }
 }
