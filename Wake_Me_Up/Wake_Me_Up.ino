@@ -1,3 +1,10 @@
+//  /-----------------------------------------------------------------------------------\
+//  |  Made by Sander van den Hoogen and Andy Driessen from 06-05-2019 till 04-06-2019  |
+//  |       This program contains logic needed to run our own custom alarm clock.       |
+//  | This project was made as a school assignment to show we are capable to deliver a  |
+//  |     fully functional finished product for our programming course at college.      |
+//  \-----------------------------------------------------------------------------------/
+
 #include <Wire.h> // Include wire library, which facilitates serial communication with lcd.
 #include <LiquidCrystal_I2C.h> // Include I2C library for lcd screen.
 #include <EEPROM.h> // Include library that allows us to write data to memory.
@@ -138,8 +145,7 @@ void loop() {
   }
   // Else if clock mode is 1, perform logic that allows user to change alarm or clock time.
   else if (gloClockMode == 1) {
-    // If ChangeClockOrAlarm is 0, it is in change alarm mode so perform logic to display programmed alarm time and to allow user to change it.
-    MethodChangeAlarm();
+    MethodChangeTime();
     MethodShowTime();
   }
 
@@ -344,27 +350,19 @@ void MethodShowTime() {
 
   // Every 400ms, display only current digit and not others for 400ms. This will create a blinking effect to indicate to user he is changing alarm.
   if (gloTimeMillis - gloPrevDigitMillis > 400) {
-    // 
-    if (gloDigitSelected == 0) {
-      MethodPrintBigNum(12, 0, 1);
-      MethodPrintBigNum(12, 4, 1);
-      MethodPrintBigNum(12, 10, 1);
+    // If this digit isn't selected, overwrite it with a blank character.
+    if (gloDigitSelected != 0) {
+      MethodPrintBigNum(12, 14, 1);
     }
     // Etc.
-    else if (gloDigitSelected == 1) {
-      MethodPrintBigNum(12, 0, 1);
-      MethodPrintBigNum(12, 4, 1);
-      MethodPrintBigNum(12, 14, 1);
-    }
-    else if (gloDigitSelected == 2) {
-      MethodPrintBigNum(12, 0, 1);
+    if (gloDigitSelected != 1) {
       MethodPrintBigNum(12, 10, 1);
-      MethodPrintBigNum(12, 14, 1);
     }
-    else if (gloDigitSelected == 3) {
+    if (gloDigitSelected != 2) {
       MethodPrintBigNum(12, 4, 1);
-      MethodPrintBigNum(12, 10, 1);
-      MethodPrintBigNum(12, 14, 1);
+    }
+    if (gloDigitSelected != 3) {
+      MethodPrintBigNum(12, 0, 1);
     }
 
     // If 800 millis have passed, reset time back to 0 so that all digits are shown again.
@@ -380,21 +378,20 @@ void MethodShowTime() {
       MethodPrintBigNum(gloAlarmHours, 4, 1);
       MethodPrintBigNum(gloAlarmMinutes2, 10, 1);
       MethodPrintBigNum(gloAlarmMinutes, 14, 1);
+      MethodPrintBigNum(11, 17, 1);
     }
     else if (gloChangeClockOrAlarm == 1) {
       MethodPrintBigNum(gloClockTimeHours2, 0, 1);
       MethodPrintBigNum(gloClockTimeHours, 4, 1);
       MethodPrintBigNum(gloClockTimeMinutes2, 10, 1);
       MethodPrintBigNum(gloClockTimeMinutes, 14, 1);
+      MethodPrintBigNum(12, 17, 1);
     }
-    
-    MethodPrintBigNum(10, 7, 1);
-    MethodPrintBigNum(11, 17, 1);
   }
 }
 
 // Method which will read joystick analog values, and perform logic to change alarm time as a consequence.
-void MethodChangeAlarm() {
+void MethodChangeTime() {
   gloJoyStickValX = analogRead(aoJoyXVal); // X val.
   gloJoyStickValY = analogRead(aoJoyYVal); // Y val.
   gloTimeMillis = millis(); // Get time.
@@ -405,7 +402,7 @@ void MethodChangeAlarm() {
     if (gloDigitSelected > 0) {
       gloDigitSelected--;
     }
-
+  
     gloJoyHeldMillis = gloTimeMillis;
     gloJoyStickState = 1;
   }
@@ -421,92 +418,185 @@ void MethodChangeAlarm() {
   }
   // Joystick is down direction, subtract 1 of current digit and perform check whether it will go below 0, and if it does, loop it around to max value.
   else if (gloJoyStickValY > 750 && gloJoyStickState == 0) {
-    if (gloDigitSelected == 0) {
-      if (gloAlarmMinutes <= 0) {
-        gloAlarmMinutes = 9; // Max is 9 for digit 0.
-      }
-      else {
-        gloAlarmMinutes--;
-      }
-    }
-    else if (gloDigitSelected == 1) {
-      if (gloAlarmMinutes2 <= 0) {
-        gloAlarmMinutes2 = 5; // Max is 5 for digit 1.
-      }
-      else {
-        gloAlarmMinutes2--;
-      }
-    }
-    else if (gloDigitSelected == 2) {
-      if (gloAlarmHours <= 0 && gloAlarmHours2 >= 2) {
-        gloAlarmHours = 3; // Max is 3 if digit 3 is 2.
-      }
-      else if (gloAlarmHours <= 0 && gloAlarmHours2 <= 1){
-        gloAlarmHours = 9; // Max is 9 if digit 3 is < 2
-      }
-      else {
-        gloAlarmHours--;
-      }
-    }
-    else if (gloDigitSelected == 3) {
-      if (gloAlarmHours2 <= 0) {
-        gloAlarmHours2 = 2; // Max is 2 for digit 3.
-
-        // If digit 2 is above or equal to 4, set it to 3, which is the max value if digit 3 is 2.
-        if (gloAlarmHours >= 4) {
-          gloAlarmHours = 3;
+    // If current mode is change alarm, change alarm digits.
+    if (gloChangeClockOrAlarm == 0) {
+      if (gloDigitSelected == 0) {
+        if (gloAlarmMinutes <= 0) {
+          gloAlarmMinutes = 9; // Max is 9 for digit 0.
+        }
+        else {
+          gloAlarmMinutes--;
         }
       }
-      else {
-        gloAlarmHours2--;
+      else if (gloDigitSelected == 1) {
+        if (gloAlarmMinutes2 <= 0) {
+          gloAlarmMinutes2 = 5; // Max is 5 for digit 1.
+        }
+        else {
+          gloAlarmMinutes2--;
+        }
+      }
+      else if (gloDigitSelected == 2) {
+        if (gloAlarmHours <= 0 && gloAlarmHours2 >= 2) {
+          gloAlarmHours = 3; // Max is 3 if digit 3 is 2.
+        }
+        else if (gloAlarmHours <= 0 && gloAlarmHours2 <= 1){
+          gloAlarmHours = 9; // Max is 9 if digit 3 is < 2
+        }
+        else {
+          gloAlarmHours--;
+        }
+      }
+      else if (gloDigitSelected == 3) {
+        if (gloAlarmHours2 <= 0) {
+          gloAlarmHours2 = 2; // Max is 2 for digit 3.
+  
+          // If digit 2 is above or equal to 4, set it to 3, which is the max value if digit 3 is 2.
+          if (gloAlarmHours >= 4) {
+            gloAlarmHours = 3;
+          }
+        }
+        else {
+          gloAlarmHours2--;
+        }
       }
     }
-    
+    // If current mode is change clock time, change clocktime values.
+    if (gloChangeClockOrAlarm == 1) {
+      if (gloDigitSelected == 0) {
+        if (gloClockTimeMinutes <= 0) {
+          gloClockTimeMinutes = 9; // Max is 9 for digit 0.
+        }
+        else {
+          gloClockTimeMinutes--;
+        }
+      }
+      else if (gloDigitSelected == 1) {
+        if (gloClockTimeMinutes2 <= 0) {
+          gloClockTimeMinutes2 = 5; // Max is 5 for digit 1.
+        }
+        else {
+          gloClockTimeMinutes2--;
+        }
+      }
+      else if (gloDigitSelected == 2) {
+        if (gloClockTimeHours <= 0 && gloClockTimeHours2 >= 2) {
+          gloClockTimeHours = 3; // Max is 3 if digit 3 is 2
+        }
+        else if (gloClockTimeHours <= 0 && gloClockTimeHours2 <= 1){
+          gloClockTimeHours = 9; // Max is 9 if digit 3 is < 2
+        }
+        else {
+          gloClockTimeHours--;
+        }
+      }
+      else if (gloDigitSelected == 3) {
+        if (gloClockTimeHours2 <= 0) {
+          gloClockTimeHours2 = 2; // Max is 2 for digit 3.
+  
+          // If digit 2 is above or equal to 4, set it to 3, which is the max value if digit 3 is 2.
+          if (gloClockTimeHours >= 4) {
+            gloClockTimeHours = 3;
+          }
+        }
+        else {
+          gloClockTimeHours2--;
+        }
+      }
+    }
+
+    gloPrevDigitMillis = gloTimeMillis; // Reset blink animation.
     gloJoyHeldMillis = gloTimeMillis;
     gloJoyStickState = 1;
   }
   // Joystick is up direction, add 1 to current digit and perform check whether it will go below max value if 1 were to be added, and if it does, loop it around to min value(0), otherwise add 1, max values are found above.
   else if (gloJoyStickValY < 250 && gloJoyStickState == 0) {
-    if (gloDigitSelected == 0) {
-      if (gloAlarmMinutes >= 9) {
-        gloAlarmMinutes = 0;
+    // If current mode is change alarm, change alarm digits.
+    if (gloChangeClockOrAlarm == 0) {
+      if (gloDigitSelected == 0) {
+        if (gloAlarmMinutes >= 9) {
+          gloAlarmMinutes = 0;
+        }
+        else {
+          gloAlarmMinutes++;
+        }
       }
-      else {
-        gloAlarmMinutes++;
+      else if (gloDigitSelected == 1) {
+        if (gloAlarmMinutes2 >= 5) {
+          gloAlarmMinutes2 = 0;
+        }
+        else {
+          gloAlarmMinutes2++;
+        }
       }
-    }
-    else if (gloDigitSelected == 1) {
-      if (gloAlarmMinutes2 >= 5) {
-        gloAlarmMinutes2 = 0;
+      else if (gloDigitSelected == 2) {
+        if (gloAlarmHours >= 9 && gloAlarmHours2 < 2) {
+          gloAlarmHours = 0;
+        }
+        else if (gloAlarmHours >= 3 && gloAlarmHours2 >= 2){
+          gloAlarmHours = 0;
+        }
+        else {
+          gloAlarmHours++;
+        }
       }
-      else {
-        gloAlarmMinutes2++;
-      }
-    }
-    else if (gloDigitSelected == 2) {
-      if (gloAlarmHours >= 9 && gloAlarmHours2 < 2) {
-        gloAlarmHours = 0;
-      }
-      else if (gloAlarmHours >= 3 && gloAlarmHours2 >= 2){
-        gloAlarmHours = 0;
-      }
-      else {
-        gloAlarmHours++;
-      }
-    }
-    else if (gloDigitSelected == 3) {
-      if (gloAlarmHours2 >= 2) {
-        gloAlarmHours2 = 0;
-      }
-      else {
-        gloAlarmHours2++;
-        
-        if (gloAlarmHours2 == 2 && gloAlarmHours >= 4) {
-          gloAlarmHours = 3;
+      else if (gloDigitSelected == 3) {
+        if (gloAlarmHours2 >= 2) {
+          gloAlarmHours2 = 0;
+        }
+        else {
+          gloAlarmHours2++;
+          
+          if (gloAlarmHours2 == 2 && gloAlarmHours >= 4) {
+            gloAlarmHours = 3;
+          }
         }
       }
     }
-    
+    // If current mode is change clock time, change clocktime values.
+    else if (gloChangeClockOrAlarm == 1) {
+      if (gloDigitSelected == 0) {
+        if (gloClockTimeMinutes >= 9) {
+          gloClockTimeMinutes = 0;
+        }
+        else {
+          gloClockTimeMinutes++;
+        }
+      }
+      else if (gloDigitSelected == 1) {
+        if (gloClockTimeMinutes2 >= 5) {
+          gloClockTimeMinutes2 = 0;
+        }
+        else {
+          gloClockTimeMinutes2++;
+        }
+      }
+      else if (gloDigitSelected == 2) {
+        if (gloClockTimeHours >= 9 && gloClockTimeHours2 < 2) {
+          gloClockTimeHours = 0;
+        }
+        else if (gloAlarmHours >= 3 && gloClockTimeHours2 >= 2){
+          gloClockTimeHours = 0;
+        }
+        else {
+          gloClockTimeHours++;
+        }
+      }
+      else if (gloDigitSelected == 3) {
+        if (gloClockTimeHours2 >= 2) {
+          gloClockTimeHours2 = 0;
+        }
+        else {
+          gloClockTimeHours2++;
+          
+          if (gloClockTimeHours2 == 2 && gloClockTimeHours >= 4) {
+            gloClockTimeHours = 3;
+          }
+        }
+      }
+    }
+
+    gloPrevDigitMillis = gloTimeMillis; // Reset blink animation.
     gloJoyHeldMillis = gloTimeMillis;
     gloJoyStickState = 1;
   }
@@ -514,192 +604,6 @@ void MethodChangeAlarm() {
   else if ((gloJoyStickValX > 250 && gloJoyStickValX < 750 && gloJoyStickValY > 250 && gloJoyStickValY < 750 || gloTimeMillis - gloJoyHeldMillis > 1000) && gloJoyStickState == 1) {
     gloJoyStickState = 0;
     gloJoyHeldMillis = gloTimeMillis;
-  }
-  // Else if no input has been detected for 10 seconds, change clockmode back to 0 to resume displaying time and writes alarm to memory.
-  else if (gloTimeMillis - gloJoyHeldMillis > 27000) {
-      gloPrevTimeMillis = gloTimeMillis; // Reset prev time.
-      MethodClockMode0();
-  }
-}
-
-// Method which displays the newly set time.
-void MethodShowClockTime() {
-  gloTimeMillis = millis(); // Get time.
-
-  // Every 400ms, display only current digit and not others for 400ms. This will create a blinking effect to indicate to user which digit he is changing.
-  if (gloTimeMillis - gloPrevDigitMillis > 400) {
-    if (gloDigitSelected == 0) {
-      MethodPrintBigNum(12, 0, 1);
-      MethodPrintBigNum(12, 4, 1);
-      MethodPrintBigNum(10, 7, 1);
-      MethodPrintBigNum(12, 10, 1);
-      MethodPrintBigNum(gloClockTimeMinutes, 14, 1);
-      MethodPrintBigNum(12, 17, 1);
-    }
-    else if (gloDigitSelected == 1) {
-      MethodPrintBigNum(12, 0, 1);
-      MethodPrintBigNum(12, 4, 1);
-      MethodPrintBigNum(10, 7, 1);
-      MethodPrintBigNum(gloClockTimeMinutes2, 10, 1);
-      MethodPrintBigNum(12, 14, 1);
-      MethodPrintBigNum(12, 17, 1);
-    }
-    else if (gloDigitSelected == 2) {
-      MethodPrintBigNum(12, 0, 1);
-      MethodPrintBigNum(gloClockTimeHours, 4, 1);
-      MethodPrintBigNum(10, 7, 1);
-      MethodPrintBigNum(12, 10, 1);
-      MethodPrintBigNum(12, 14, 1);
-      MethodPrintBigNum(12, 17, 1);
-    }
-    else if (gloDigitSelected == 3) {
-      MethodPrintBigNum(gloClockTimeHours2, 0, 1);
-      MethodPrintBigNum(12, 4, 1);
-      MethodPrintBigNum(10, 7, 1);
-      MethodPrintBigNum(12, 10, 1);
-      MethodPrintBigNum(12, 14, 1);
-      MethodPrintBigNum(12, 17, 1);
-    }
-
-    // If 800 millis have passed, reset time back to 0 so that all digits are shown again.
-    if (gloTimeMillis - gloPrevDigitMillis > 800) {
-      gloPrevDigitMillis = gloTimeMillis; // Update time
-    }
-  }
-  // Else display all digits.
-  else {
-    MethodPrintBigNum(gloClockTimeHours2, 0, 1);
-    MethodPrintBigNum(gloClockTimeHours, 4, 1);
-    MethodPrintBigNum(10, 7, 1);
-    MethodPrintBigNum(gloClockTimeMinutes2, 10, 1);
-    MethodPrintBigNum(gloClockTimeMinutes, 14, 1);
-    MethodPrintBigNum(12, 17, 1);
-  }
-}
-
-// Method which will read joystick analog values, and perform logic to change alarm time as a consequence.
-void MethodChangeClockTime() {
-  gloJoyStickValX = analogRead(aoJoyXVal); // X val.
-  gloJoyStickValY = analogRead(aoJoyYVal); // Y val.
-  gloTimeMillis = millis(); // Get time.
-
-  // Check what position the joystick is in and if it has already performed an action in previous cycle(gloJoyStickState). Joystick is right direction.
-  if (gloJoyStickValX > 750 && gloJoyStickState == 0) {
-    // If there is a digit further to the right, select digit on the right.
-    if (gloDigitSelected > 0) {
-      gloDigitSelected--;
-    }
-
-    gloJoyHeldMillis = gloTimeMillis;
-    gloJoyStickState = 1;
-  }
-  // Joystick is left direction, select digit to the left.
-  else if (gloJoyStickValX < 250 && gloJoyStickState == 0) {
-    // If there is a digit to the left, select digit to the left.
-    if (gloDigitSelected < 3) {
-      gloDigitSelected++;
-    }
-
-    gloJoyHeldMillis = gloTimeMillis;
-    gloJoyStickState = 1;
-  }
-  // Joystick is down direction, subtract 1 of current digit and perform check whether it will go below 0 if a digit were to be subtracted, and if it does, loop it around to max value, otherwise subtract 1.
-  else if (gloJoyStickValY > 750 && gloJoyStickState == 0) {
-    if (gloDigitSelected == 0) {
-      if (gloClockTimeMinutes <= 0) {
-        gloClockTimeMinutes = 9; // Max is 9 for digit 0.
-      }
-      else {
-        gloClockTimeMinutes--;
-      }
-    }
-    else if (gloDigitSelected == 1) {
-      if (gloClockTimeMinutes2 <= 0) {
-        gloClockTimeMinutes2 = 5; // Max is 5 for digit 1.
-      }
-      else {
-        gloClockTimeMinutes2--;
-      }
-    }
-    else if (gloDigitSelected == 2) {
-      if (gloClockTimeHours <= 0 && gloClockTimeHours2 >= 2) {
-        gloClockTimeHours = 3; // Max is 3 if digit 3 is 2
-      }
-      else if (gloClockTimeHours <= 0 && gloClockTimeHours2 <= 1){
-        gloClockTimeHours = 9; // Max is 9 if digit 3 is < 2
-      }
-      else {
-        gloClockTimeHours--;
-      }
-    }
-    else if (gloDigitSelected == 3) {
-      if (gloClockTimeHours2 <= 0) {
-        gloClockTimeHours2 = 2; // Max is 2 for digit 3.
-
-        // If digit 2 is above or equal to 4, set it to 3, which is the max value if digit 3 is 2.
-        if (gloClockTimeHours >= 4) {
-          gloClockTimeHours = 3;
-        }
-      }
-      else {
-        gloClockTimeHours2--;
-      }
-    }
-    
-    gloJoyHeldMillis = gloTimeMillis;
-    gloJoyStickState = 1;
-  }
-  // Joystick is up direction, add 1 to current digit and perform check whether it will go below max value if 1 were to be added, and if it does, loop it around to min value(0), otherwise add 1, max values are found above.
-  else if (gloJoyStickValY < 250 && gloJoyStickState == 0) {
-    if (gloDigitSelected == 0) {
-      if (gloClockTimeMinutes >= 9) {
-        gloClockTimeMinutes = 0;
-      }
-      else {
-        gloClockTimeMinutes++;
-      }
-    }
-    else if (gloDigitSelected == 1) {
-      if (gloClockTimeMinutes2 >= 5) {
-        gloClockTimeMinutes2 = 0;
-      }
-      else {
-        gloClockTimeMinutes2++;
-      }
-    }
-    else if (gloDigitSelected == 2) {
-      if (gloClockTimeHours >= 9 && gloClockTimeHours2 < 2) {
-        gloClockTimeHours = 0;
-      }
-      else if (gloAlarmHours >= 3 && gloClockTimeHours2 >= 2){
-        gloClockTimeHours = 0;
-      }
-      else {
-        gloClockTimeHours++;
-      }
-    }
-    else if (gloDigitSelected == 3) {
-      if (gloClockTimeHours2 >= 2) {
-        gloClockTimeHours2 = 0;
-      }
-      else {
-        gloClockTimeHours2++;
-        
-        if (gloClockTimeHours2 == 2 && gloClockTimeHours >= 4) {
-          gloClockTimeHours = 3;
-        }
-      }
-    }
-    
-    gloJoyHeldMillis = gloTimeMillis;
-    gloJoyStickState = 1;
-  }
-  // Else if stick is in middle or a second has passed, reset gloJoyStickState to 0 to allow new input on next cycle.
-  else if ((gloJoyStickValX > 250 && gloJoyStickValX < 750 && gloJoyStickValY > 250 && gloJoyStickValY < 750 || gloTimeMillis - gloJoyHeldMillis > 1000) && gloJoyStickState == 1) {
-    gloJoyStickState = 0;
-    gloJoyHeldMillis = gloTimeMillis;
-    //gloCountMinutes = (String(gloClockTimeMinutes2) + String(gloClockTimeMinutes)).toInt(); // Combine 2 seperate minute values.
-    //gloCountHours = (String(gloClockTimeHours2) + String(gloClockTimeHours)).toInt(); // Combine 2 seperate minute values.
   }
   // Else if no input has been detected for 10 seconds, change clockmode back to 0 to resume displaying time and writes alarm to memory.
   else if (gloTimeMillis - gloJoyHeldMillis > 27000) {
