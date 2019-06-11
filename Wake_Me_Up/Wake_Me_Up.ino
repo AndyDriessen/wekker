@@ -147,8 +147,8 @@ void loop() {
   }
   // Else if clock mode is 1, perform logic that allows user to change alarm or clock time.
   else if (gloClockMode == 1) {
-    MethodChangeTime();
     MethodShowTime();
+    MethodChangeTime();
   }
 
   // If alarm isn't currently going off, check for misc inputs.
@@ -614,9 +614,10 @@ void MethodChangeTime() {
     gloJoyStickState = 0;
     gloJoyHeldMillis = gloTimeMillis;
   }
-  // Else if no input has been detected for 10 seconds, change clockmode back to 0 to resume displaying time and writes alarm to memory.
+  // Else if no input has been detected for 27 seconds, change clockmode back to 0 to resume displaying time and writes alarm to memory.
   else if (gloTimeMillis - gloJoyHeldMillis > 27000) {
-      MethodClockMode0();
+    Serial.println("Idled too long, switching back to clock mode 0...");
+    MethodClockMode0();
   }
 }
 
