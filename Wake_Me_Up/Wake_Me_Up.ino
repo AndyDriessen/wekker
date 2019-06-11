@@ -1,5 +1,5 @@
 //  /-----------------------------------------------------------------------------------\
-//  |  Made by Sander van den Hoogen and Andy Driessen from 06-05-2019 till 04-06-2019  |
+//  |  Made by Sander van den Hoogen and Andy Driessen from 06-05-2019 till 05-06-2019  |
 //  |       This program contains logic needed to run our own custom alarm clock.       |
 //  | This project was made as a school assignment to show we are capable to deliver a  |
 //  |     fully functional finished product for our programming course at college.      |
@@ -57,6 +57,8 @@ bool gloBtnSnoozeState = 0;     // Keeps track of previous state of snooze butto
 
 bool gloClockMode = 0;          // What mode clock is in(0 is display time, 1 is change time).
 bool gloChangeClockOrAlarm = 0; // Variable that keeps track of whether we are changing alarm(0) or clock time(1).
+bool gloChangedClockTime = 0;   // Keeps track of whether user has changed the clock time, if he has, the time tracking will be reset so that passed time will not be added to newly configured time.
+bool gloChangedAlarmTime = 0;   // Whether alarm time has changed, if it has, it will save new alarm time to memory.
 bool gloDoAlarm = 1;            // Whether alarm should go off or not.
 bool gloAlarmSnoozed = 0;       // If alarm is currently snoozed.
 bool gloSoundAlarm = 0;         // Variable that will make alarm go off.
@@ -258,8 +260,7 @@ void MethodFallingTone() {
   }
 }
 
-// Method playing sound through buzzer, found on internet, source provided below. Code used from 274 to 290 with minor tweaks.
-// https://create.arduino.cc/projecthub/jrance/super-mario-theme-song-w-piezo-buzzer-and-arduino-1cc2e4?ref=search&ref_id=buzzer&offset=5
+// Method playing sound through buzzer, found on internet, source provided below. Code used from 274 to 290 with minor tweaks. https://create.arduino.cc/projecthub/jrance/super-mario-theme-song-w-piezo-buzzer-and-arduino-1cc2e4?ref=search&ref_id=buzzer&offset=5
 void MethodBuzzer(int locTargetPin, long locFrequency, long locMLength) {
   digitalWrite(13, HIGH);
   long locDelay = 1000000 / locFrequency / 1; // Was 2, calculate the delay value between transitions. 1 seconds worth of microseconds, divided by the locFrequency, then split in half since there are two phases to each cycle.
@@ -420,6 +421,8 @@ void MethodChangeTime() {
   else if (gloJoyStickValY > 750 && gloJoyStickState == 0) {
     // If current mode is change alarm, change alarm digits.
     if (gloChangeClockOrAlarm == 0) {
+      gloChangedAlarmTime = 1; // Update value that alarm has changed, so that new alarm will be saved to memory.
+      
       if (gloDigitSelected == 0) {
         if (gloAlarmMinutes <= 0) {
           gloAlarmMinutes = 9; // Max is 9 for digit 0.
@@ -463,6 +466,8 @@ void MethodChangeTime() {
     }
     // If current mode is change clock time, change clocktime values.
     if (gloChangeClockOrAlarm == 1) {
+      gloChangedClockTime = 1; // Update value of changed clock time, so that timer will be reset.
+      
       if (gloDigitSelected == 0) {
         if (gloClockTimeMinutes <= 0) {
           gloClockTimeMinutes = 9; // Max is 9 for digit 0.
@@ -513,6 +518,8 @@ void MethodChangeTime() {
   else if (gloJoyStickValY < 250 && gloJoyStickState == 0) {
     // If current mode is change alarm, change alarm digits.
     if (gloChangeClockOrAlarm == 0) {
+      gloChangedAlarmTime = 1; // Update value that alarm has changed, so that new alarm will be saved to memory.
+      
       if (gloDigitSelected == 0) {
         if (gloAlarmMinutes >= 9) {
           gloAlarmMinutes = 0;
@@ -555,6 +562,8 @@ void MethodChangeTime() {
     }
     // If current mode is change clock time, change clocktime values.
     else if (gloChangeClockOrAlarm == 1) {
+      gloChangedClockTime = 1; // Update value of changed clock time, so that timer will be reset.
+      
       if (gloDigitSelected == 0) {
         if (gloClockTimeMinutes >= 9) {
           gloClockTimeMinutes = 0;
@@ -607,18 +616,8 @@ void MethodChangeTime() {
   }
   // Else if no input has been detected for 10 seconds, change clockmode back to 0 to resume displaying time and writes alarm to memory.
   else if (gloTimeMillis - gloJoyHeldMillis > 27000) {
-      gloPrevTimeMillis = gloTimeMillis; // Reset prev time.
       MethodClockMode0();
   }
-}
-
-// Method which writes current alarm to memory, needs to be method because it's used twice.
-void MethodWriteAlarmToMemory() {
-  Serial.println("Alarm time set to: " + String(gloAlarmHours2) + String(gloAlarmHours) + ":" + String(gloAlarmMinutes2) + String(gloAlarmMinutes)); // Print set alarm.
-  EEPROM.write(0, gloAlarmMinutes); // Write int alarm minutes to memory.
-  EEPROM.write(1, gloAlarmMinutes2); // Write minutes2 to memory.
-  EEPROM.write(2, gloAlarmHours); // Write hour to memory.
-  EEPROM.write(3, gloAlarmHours2); // Write hour2 to memory.
 }
 
 // Method which checks for joystick button press, if it is held for 2 seconds it changes alarm mode to either 'change alarm' or 'display time'.
@@ -650,7 +649,6 @@ void MethodJoyPress() {
       }
       // Change clock mode to "display time".
       else if (gloClockMode == 1) {
-        gloPrevTimeMillis = gloTimeMillis; // Reset prev time.
         MethodClockMode0();
       }
 
@@ -737,16 +735,31 @@ void MethodTmrTick() {
 
 // Method which displays current time and performs logic to redisplay time properly.
 void MethodClockMode0() {
-    gloClockMode = 0;
-    Serial.println("Changing to Clock mode 0, displaying time..."); // Print debug text.
-    MethodWriteAlarmToMemory(); // Run method that writes alarm to memory.
-    
-    MethodPrintBigNum(gloClockTimeHours2, 0, 1); // Prints hours.
-    MethodPrintBigNum(gloClockTimeHours, 4, 1);
-    MethodPrintBigNum(10, 7, 1); // Prints a ':'.
-    MethodPrintBigNum(gloClockTimeMinutes2, 10, 1); // Print minutes.
-    MethodPrintBigNum(gloClockTimeMinutes, 14, 1);
-    
+  gloClockMode = 0;
+  Serial.println("Changing to Clock mode 0, displaying time..."); // Print debug text.
+  
+  MethodPrintBigNum(gloClockTimeHours2, 0, 1); // Prints hours.
+  MethodPrintBigNum(gloClockTimeHours, 4, 1);
+  MethodPrintBigNum(10, 7, 1); // Prints a ':'.
+  MethodPrintBigNum(gloClockTimeMinutes2, 10, 1); // Print minutes.
+  MethodPrintBigNum(gloClockTimeMinutes, 14, 1);
+
+  if (gloChangedAlarmTime == 1) {
+    Serial.println("Alarm time set to: " + String(gloAlarmHours2) + String(gloAlarmHours) + ":" + String(gloAlarmMinutes2) + String(gloAlarmMinutes)); // Print set alarm.
+    EEPROM.write(0, gloAlarmMinutes); // Write int alarm minutes to memory.
+    EEPROM.write(1, gloAlarmMinutes2); // Write minutes2 to memory.
+    EEPROM.write(2, gloAlarmHours); // Write hour to memory.
+    EEPROM.write(3, gloAlarmHours2); // Write hour2 to memory.
+    gloChangedAlarmTime = 0;
+  }
+  
+  // If user has change the clocktime, reset the passed time that happened during changing of alarm/ clock time, so that it will not be added to the new time and reset this value.
+  if (gloChangedClockTime == 1) {
+    gloTimeMillis = millis();
+    gloPrevTimeMillis = gloTimeMillis;
+    gloChangedClockTime = 0;
+  }
+  
   // If alarm is toggled on, add a '.' to display as user feedback.
   if (gloDoAlarm == 1) {
     MethodPrintBigNum(11, 17, 1); // Print '.'.
